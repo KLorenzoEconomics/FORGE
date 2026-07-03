@@ -114,6 +114,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .cal-day.done .cal-session-tag{background:var(--green);color:#d4f5b0;}
 .cal-day.upcoming .cal-session-tag{color:var(--subtle);}
 .cal-check{position:absolute;top:4px;right:4px;font-size:9px;color:var(--green-txt);}
+.cal-day.selected{outline:2px solid var(--xp);outline-offset:1px;}
+.cal-day.done.selected{outline-color:var(--green-txt);}
 
 /* ── Separador ── */
 .divider{height:0.5px;background:var(--border);margin:18px 20px 0;}
@@ -432,16 +434,18 @@ function renderCal(){
     const routineId=DOW_MAP[dw];
     const r=routineId?ROUTINE.find(x=>x.id===routineId):null;
 
+    const isSelected = dk===(selectedDateKey||todayKey());
     let cls='cal-day';
     if(isDone)cls+=' done';
     else if(isToday)cls+=' today';
     else if(isRest)cls+=' rest-day';
     else if(!isPast)cls+=' upcoming';
+    if(isSelected)cls+=' selected';
 
     const tag=r?r.name:'REST';
     const checkmark=isDone?`<div class="cal-check">✓</div>`:'';
 
-    html+=`<div class="${cls}">
+    html+=`<div class="${cls}" onclick="selectCalDay('${dk}')" style="cursor:pointer;">
       ${checkmark}
       <div class="cal-dow">${DAY_ABBR[dw]}</div>
       <div class="cal-num">${d.getUTCDate()}</div>
@@ -566,76 +570,130 @@ function goTab(t){
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 
 /* ══════════════════════════════
-   HOY
+   HOY — vista del día seleccionado
 ══════════════════════════════ */
-function renderHoy(){
-  const r=todayRoutine();const el=document.getElementById('viewHoy');
-  const tk=todayKey();const log=S.logs[tk]||{};const done=log.completed||false;
-  // ¿Hay sesión pendiente de ayer que se movió a hoy?
-  const pendingId=S.pendingSession;
-  const pendingR=pendingId?ROUTINE.find(x=>x.id===pendingId):null;
-  const effectiveR=pendingR||r;
+let selectedDateKey = null; // null = hoy
 
+function renderHoy(){
+  const tk = selectedDateKey || todayKey();
+  const isTodayView = tk === todayKey();
+  const el = document.getElementById('viewHoy');
+
+  // Qué día de la semana es el dateKey seleccionado
+  const selDate = new Date(tk + 'T12:00:00');
+  const selDow = selDate.getDay();
+  const routineId = DOW_MAP[selDow];
+  const log = S.logs[tk] || {};
+  const done = log.completed || false;
+
+  // Sesión pendiente (solo aplica si es hoy)
+  const pendingId = isTodayView ? S.pendingSession : null;
+  const pendingR = pendingId ? ROUTINE.find(x=>x.id===pendingId) : null;
+  const baseR = routineId ? ROUTINE.find(x=>x.id===routineId) : null;
+  const effectiveR = pendingR || baseR;
+
+  // Banner de navegación si no es hoy
+  let navBanner = '';
+  if(!isTodayView){
+    const dayNames=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const parts = tk.split('-');
+    const label = `${dayNames[selDow]} ${parseInt(parts[2])}/${parseInt(parts[1])}`;
+    navBanner = `<div style="margin:0 20px 10px;padding:10px 14px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--r);display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:12px;color:var(--muted);">📅 Viendo: <b style="color:var(--text)">${label}</b></div>
+      <button onclick="selectedDateKey=null;renderHoy();renderCal();" style="background:var(--xp-bg);border:0.5px solid var(--xp-dim);color:var(--xp);border-radius:var(--r-sm);padding:6px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;">Ir a hoy</button>
+    </div>`;
+  }
+
+  // Día de descanso sin pendiente
   if(!effectiveR){
-    el.innerHTML=`<div style="padding:0 0 10px"></div>
+    el.innerHTML = navBanner + `<div style="padding:0 0 10px"></div>
     <div class="rest-card">
       <div class="rest-icon">🛌</div>
       <div class="rest-title">Día de descanso</div>
       <div class="rest-sub">Recupera. Los músculos crecen fuera del gym.<br>Mañana volvemos.</div>
-    </div>`;return;
+    </div>`;
+    return;
   }
 
-  // Si hoy toca descanso pero hay una sesión perdida pendiente, mostrarla
-  if(!r&&pendingR){
-    // mostrar banner de sesión recuperada — continuar con pendingR como sesión de hoy
+  // Banner sesión perdida / recuperada (solo hoy)
+  let missedBanner = '';
+  if(isTodayView && !done){
+    if(pendingR){
+      missedBanner = `<div style="margin:0 20px 10px;padding:12px 14px;background:#1a1208;border:0.5px solid var(--gold);border-radius:var(--r);">
+        <div style="font-size:12px;color:var(--gold);">Sesión recuperada: <b>${pendingR.name}</b></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Completala hoy para mantener el progreso.</div>
+      </div>`;
+    } else if(baseR){
+      missedBanner = `<div style="margin:0 20px 10px;padding:12px 14px;background:#1a1208;border:0.5px solid var(--gold);border-radius:var(--r);display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:12px;color:var(--gold);line-height:1.5;">¿No pudiste venir hoy?<br><span style="color:var(--muted);font-size:11px;">Pasa la sesión a mañana — la racha se reinicia.</span></div>
+        <button onclick="missSession()" style="background:var(--gold-bg);border:0.5px solid var(--gold);color:var(--gold);border-radius:var(--r-sm);padding:8px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;margin-left:10px;">Pasar →</button>
+      </div>`;
+    }
   }
 
-  // Si hoy toca entrenamiento y no se ha perdido nada, ofrecer opción de pasar a mañana
-  const missedBanner=(!log.completed&&!r&&!pendingR)?'':
-    (r&&!log.completed&&!pendingR)?`<div style="margin:0 20px 10px;padding:12px 14px;background:#1a1208;border:0.5px solid var(--gold);border-radius:var(--r);display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:12px;color:var(--gold);line-height:1.5;">¿No pudiste venir hoy?<br><span style="color:var(--muted);font-size:11px;">Pasa la sesión a mañana — la racha se reinicia.</span></div>
-      <button onclick="missSession()" style="background:var(--gold-bg);border:0.5px solid var(--gold);color:var(--gold);border-radius:var(--r-sm);padding:8px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;margin-left:10px;">Pasar →</button>
-    </div>`:
-    (pendingR&&!log.completed)?`<div style="margin:0 20px 10px;padding:12px 14px;background:#1a1208;border:0.5px solid var(--gold);border-radius:var(--r);">
-      <div style="font-size:12px;color:var(--gold);">Sesión recuperada: <b>${pendingR.name}</b></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px;">Completala hoy para mantener el progreso.</div>
-    </div>`:'';
-  const totalSets=effectiveR.exercises.reduce((a,e)=>a+e.sets,0);
-  const doneSets=effectiveR.exercises.reduce((a,e,ei)=>a+e.rirs.filter((_,si)=>S.session[`${effectiveR.id}_${ei}_${si}`]?.tick).length,0);
-  const pctDone=totalSets>0?Math.round(doneSets/totalSets*100):0;
-  const _rs=getRestSecs();const rm=Math.floor(_rs/60).toString().padStart(2,'0');const rs=(_rs%60).toString().padStart(2,'0');
+  const totalSets = effectiveR.exercises.reduce((a,e)=>a+e.sets,0);
+  const doneSets  = effectiveR.exercises.reduce((a,e,ei)=>a+e.rirs.filter((_,si)=>S.session[`${effectiveR.id}_${ei}_${si}`]?.tick).length,0);
+  const pctDone   = totalSets>0 ? Math.round(doneSets/totalSets*100) : 0;
+
+  const _rs=getRestSecs();const rm=Math.floor(_rs/60).toString().padStart(2,'0');const rs2=(_rs%60).toString().padStart(2,'0');
   const _st=getSessSecs();const sh=Math.floor(_st/3600);const sm=Math.floor((_st%3600)/60).toString().padStart(2,'0');const ss2=(_st%60).toString().padStart(2,'0');
   const sessDisp=sh>0?`${sh}:${sm}:${ss2}`:`${sm}:${ss2}`;
-  let h=`<div style="padding:4px 0"></div>`;
-  h+=missedBanner;
-  h+=`<div class="sec-lbl">Sesión de hoy — ${pctDone}% completado</div>`;
-  h+=`<div class="day-card${done?' done-card':''}" id="mainCard">`;
-  h+=`<div class="day-card-head"><div class="day-head-left"><div class="day-name" style="color:${dayColor(effectiveR.id)}">${effectiveR.name}</div><div class="day-meta">${effectiveR.day} · ~${effectiveR.dur} min ref. · ${effectiveR.exercises.length} ejercicios</div></div><div class="day-head-right"><div class="day-xp-tag">+${xpForDay()} XP</div><div class="done-ring${done?' completed':''}">${done?'✓':'○'}</div></div></div>`;
-  h+=`<div class="session-body" id="sessionBody">`;
-  h+=`<div class="dual-timer">`;
-  h+=`<div class="timer-block"><div class="timer-block-label">Descanso</div><div id="restDisp" class="timer-display xp-col${restSecs<=10&&restSecs>0?' urgent':''}">${rm}:${rs}</div><div class="timer-controls"><button class="t-btn ${restRunning?'running':'go'}" id="restGoBtn" onclick="toggleRest()">${restRunning?'⏸ Pausa':'▶ Iniciar'}</button><div class="timer-row"><button class="t-btn" onclick="setRest(60)">60s</button><button class="t-btn" onclick="setRest(90)">90s</button><button class="t-btn" onclick="setRest(120)">2m</button><button class="t-btn" onclick="setRest(180)">3m</button></div></div></div>`;
-  h+=`<div class="timer-block"><div class="timer-block-label">Sesión ⏱</div><div id="sessDisp" class="timer-display green-col">${sessDisp}</div><div class="timer-controls"><button class="t-btn ${sessRunning?'session-running':'session-go'}" id="sessGoBtn" onclick="toggleSess()">${sessRunning?'⏸ Pausar':'▶ Iniciar sesión'}</button><div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.4;">5s para sincronizar tu reloj</div></div></div>`;
-  h+=`</div>`;
+
+  let h = `<div style="padding:4px 0"></div>`;
+  h += navBanner + missedBanner;
+  h += `<div class="sec-lbl">${isTodayView?'Sesión de hoy':'Sesión del día'} — ${pctDone}% completado</div>`;
+  h += `<div class="day-card${done?' done-card':''}" id="mainCard">`;
+  h += `<div class="day-card-head"><div class="day-head-left"><div class="day-name" style="color:${dayColor(effectiveR.id)}">${effectiveR.name}</div><div class="day-meta">${effectiveR.day} · ~${effectiveR.dur} min ref. · ${effectiveR.exercises.length} ejercicios</div></div><div class="day-head-right"><div class="day-xp-tag">+${xpForDay()} XP</div><div class="done-ring${done?' completed':''}">${done?'✓':'○'}</div></div></div>`;
+  h += `<div class="session-body">`;
+
+  // Timers solo si es hoy y no está completado
+  if(isTodayView && !done){
+    h += `<div class="dual-timer">`;
+    h += `<div class="timer-block"><div class="timer-block-label">Descanso</div><div id="restDisp" class="timer-display xp-col${_rs<=10&&_rs>0?' urgent':''}">${rm}:${rs2}</div><div class="timer-controls"><button class="t-btn ${restRunning?'running':'go'}" id="restGoBtn" onclick="toggleRest()">${restRunning?'⏸ Pausa':'▶ Iniciar'}</button><div class="timer-row"><button class="t-btn" onclick="setRest(60)">60s</button><button class="t-btn" onclick="setRest(90)">90s</button><button class="t-btn" onclick="setRest(120)">2m</button><button class="t-btn" onclick="setRest(180)">3m</button></div></div></div>`;
+    h += `<div class="timer-block"><div class="timer-block-label">Sesión ⏱</div><div id="sessDisp" class="timer-display green-col">${sessDisp}</div><div class="timer-controls"><button class="t-btn ${sessRunning?'session-running':'session-go'}" id="sessGoBtn" onclick="toggleSess()">${sessRunning?'⏸ Pausar':'▶ Iniciar sesión'}</button><div style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.4;">5s para sincronizar tu reloj</div></div></div>`;
+    h += `</div>`;
+  }
+
   effectiveR.exercises.forEach((ex,ei)=>{
-    const starLbl=ex.star===2?'★★ PRIORITARIO':ex.star===1?'★ CLAVE':null;
-    let params=`${ex.sets}×${ex.rng}`;if(ex.exc)params+=` · ${ex.exc}`;params+=` · desc ${ex.rest}s · ${ex.tgt}`;
-    h+=`<div class="exercise"><div class="ex-top"><div class="ex-name">${ex.n}</div>${starLbl?`<div class="ex-star">${starLbl}</div>`:''}</div><div class="ex-params">${params}</div>`;
-    h+=`<div class="sets-head"><span>#</span><span>kg</span><span>reps</span><span>${ex.rirs[0]===-1?'—':'RIR'}</span><span></span></div>`;
+    const starLbl = ex.star===2?'★★ PRIORITARIO':ex.star===1?'★ CLAVE':null;
+    let params = `${ex.sets}×${ex.rng}`;if(ex.exc)params+=` · ${ex.exc}`;params+=` · desc ${ex.rest}s · ${ex.tgt}`;
+    h += `<div class="exercise"><div class="ex-top"><div class="ex-name">${ex.n}</div>${starLbl?`<div class="ex-star">${starLbl}</div>`:''}</div><div class="ex-params">${params}</div>`;
+    h += `<div class="sets-head"><span>#</span><span>kg</span><span>reps</span><span>${ex.rirs[0]===-1?'—':'RIR'}</span><span></span></div>`;
     ex.rirs.forEach((rir,si)=>{
-      const k=`${effectiveR.id}_${ei}_${si}`;const sv=S.session[k]||{kg:'',reps:'',rir:rir>=0?rir:'',tick:false};
-      const filled=sv.kg!==''&&sv.reps!=='';const isPR=filled&&checkPR(r.id,ei,sv.kg);
-      h+=`<div class="set-row"><div class="set-n">S${si+1}</div>`;
-      h+=`<input class="set-inp${filled?' has-val':''}" type="number" step="0.5" placeholder="kg" value="${sv.kg}" ${done?'disabled':''} oninput="upd('${effectiveR.id}',${ei},${si},'kg',this.value);this.classList.toggle('has-val',this.value!=='')">`;
-      h+=`<input class="set-inp${filled?' has-val':''}" type="number" placeholder="reps" value="${sv.reps}" ${done?'disabled':''} oninput="upd('${effectiveR.id}',${ei},${si},'reps',this.value);this.classList.toggle('has-val',this.value!=='')">`;
-      if(rir>=0){h+=`<select class="rir-sel" onchange="upd('${effectiveR.id}',${ei},${si},'rir',this.value)" ${done?'disabled':''}>${[3,2,1,0].map(v=>`<option value="${v}" ${sv.rir==v?'selected':''}>${v}</option>`).join('')}</select>`;}else{h+=`<div style="width:56px"></div>`;}
-      h+=`<div class="set-tick${sv.tick?' ticked':''}" onclick="tickSet('${effectiveR.id}',${ei},${si})">${sv.tick?'✓':''}</div></div>`;
+      const k=`${effectiveR.id}_${ei}_${si}`;
+      const sv=S.session[k]||{kg:'',reps:'',rir:rir>=0?rir:'',tick:false};
+      const filled=sv.kg!==''&&sv.reps!=='';
+      const isPR=filled&&checkPR(effectiveR.id,ei,sv.kg);
+      const dis=done?'disabled':'';
+      h += `<div class="set-row"><div class="set-n">S${si+1}</div>`;
+      h += `<input class="set-inp${filled?' has-val':''}" type="number" step="0.5" placeholder="kg" value="${sv.kg}" ${dis} oninput="upd('${effectiveR.id}',${ei},${si},'kg',this.value);this.classList.toggle('has-val',this.value!=='')">`;
+      h += `<input class="set-inp${filled?' has-val':''}" type="number" placeholder="reps" value="${sv.reps}" ${dis} oninput="upd('${effectiveR.id}',${ei},${si},'reps',this.value);this.classList.toggle('has-val',this.value!=='')">`;
+      if(rir>=0){h+=`<select class="rir-sel" onchange="upd('${effectiveR.id}',${ei},${si},'rir',this.value)" ${dis}>${[3,2,1,0].map(v=>`<option value="${v}" ${sv.rir==v?'selected':''}>${v}</option>`).join('')}</select>`;}
+      else{h+=`<div style="width:56px"></div>`;}
+      h += `<div class="set-tick${sv.tick?' ticked':''}" onclick="${!done?`tickSet('${effectiveR.id}',${ei},${si})`:''}">${sv.tick?'✓':''}</div></div>`;
       if(isPR)h+=`<div class="pr-flag">🏆 PR nuevo</div>`;
     });
-    h+=`</div>`;
+    h += `</div>`;
   });
-  h+=`<button class="complete-btn${done?' is-done':''}" onclick="completeSession('${effectiveR.id}')" ${done?'disabled':''}>${done?'✓ Sesión completada — ¡crack!':'Completar sesión'}</button>`;
-  h+=`</div></div>`;
-  el.innerHTML=h;
+
+  // Botón completar: solo si es hoy
+  if(isTodayView){
+    h += `<button class="complete-btn${done?' is-done':''}" onclick="completeSession('${effectiveR.id}')" ${done?'disabled':''}>${done?'✓ Sesión completada — ¡crack!':'Completar sesión'}</button>`;
+  } else if(done){
+    h += `<div style="margin-top:16px;padding:12px;background:var(--green-bg);border:0.5px solid var(--green);border-radius:var(--r);text-align:center;font-size:13px;color:var(--green-txt);">✓ Sesión completada ese día${log.durSecs?` · ${fmtDur(log.durSecs)}`:''}</div>`;
+  } else {
+    h += `<div style="margin-top:16px;padding:12px;background:var(--surface2);border:0.5px solid var(--border2);border-radius:var(--r);text-align:center;font-size:12px;color:var(--muted);">Solo puedes completar sesiones del día actual</div>`;
+  }
+
+  h += `</div></div>`;
+  el.innerHTML = h;
+}
+
+function selectCalDay(dk){
+  selectedDateKey = dk===todayKey() ? null : dk;
+  // Cambiar a pestaña Hoy para mostrar el día
+  goTab('hoy');
+  renderCal();
 }
 
 function missSession(){
