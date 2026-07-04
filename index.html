@@ -193,6 +193,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .empty-icon{font-size:36px;margin-bottom:12px}
 .empty-title{font-size:15px;font-weight:600;color:var(--subtle);margin-bottom:6px}
 .empty-sub{font-size:13px;line-height:1.5}
+/* Barra fija completar */
+#fixedCompleteBar{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:12px 20px;background:#0e0e0e;border-top:.5px solid #7f77dd;z-index:55;box-shadow:0 -4px 20px rgba(0,0,0,.6)}
+#fixedCompleteBar button{width:100%;padding:14px;border:none;border-radius:10px;background:#7f77dd;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .15s}
+#fixedCompleteBar button:active{opacity:.85}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 input[type=number]{-moz-appearance:textfield}
 </style>
@@ -441,6 +445,9 @@ function showToast(msg){var el=document.getElementById('toast');el.textContent=m
 var currentTab='hoy';
 function goTab(t){
   currentTab=t;
+  // Limpiar barras flotantes al cambiar tab
+  var fb=document.getElementById('fixedCompleteBar');if(fb&&t!=='hoy')fb.style.display='none';
+  var cb=document.getElementById('confirmBar');if(cb)cb.remove();
   ['hoy','historial','stats'].forEach(function(id){
     document.getElementById('view'+id.charAt(0).toUpperCase()+id.slice(1)).style.display=t===id?'block':'none';
     document.getElementById('nav'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('active',t===id);
@@ -654,6 +661,30 @@ function renderHoy(){
 
   html+='</div></div>';
   el.innerHTML=html;
+}
+
+// IDs guardados para la confirmación
+var _pendingDayId=null,_pendingTk=null;
+function askComplete(dayId,tk){
+  _pendingDayId=dayId;_pendingTk=tk;
+  var conf=document.getElementById('confirmBar');
+  if(conf){conf.remove();return}
+  var bar=document.createElement('div');
+  bar.id='confirmBar';
+  bar.style.cssText='position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #ba7517;padding:14px 20px;z-index:60;display:flex;gap:10px;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,.8)';
+  var txt=document.createElement('div');
+  txt.style.cssText='flex:1;font-size:13px;color:#e8e6e0;line-height:1.4';
+  txt.innerHTML='Seguro que quieres<br>completar la sesión?';
+  var btnCancel=document.createElement('button');
+  btnCancel.textContent='Cancelar';
+  btnCancel.style.cssText='padding:10px 16px;border:.5px solid #383838;border-radius:8px;background:transparent;color:#aaa;font-size:13px;font-family:inherit;cursor:pointer';
+  btnCancel.onclick=function(){bar.remove()};
+  var btnOk=document.createElement('button');
+  btnOk.textContent='Confirmar';
+  btnOk.style.cssText='padding:10px 16px;border:none;border-radius:8px;background:#7f77dd;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer';
+  btnOk.onclick=function(){bar.remove();completeOn(_pendingDayId,_pendingTk)};
+  bar.appendChild(txt);bar.appendChild(btnCancel);bar.appendChild(btnOk);
+  document.querySelector('.app').appendChild(bar);
 }
 
 function dayColor(id){return{push:'#9d96e8',pull:'#4dc9a0',legs:'#e07050',upper:'#8884cc',lower:'#ccaa44'}[id]||'#7f77dd'}
