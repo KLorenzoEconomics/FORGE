@@ -654,7 +654,7 @@ function renderHoy(){
   // Botón completar
   var canComplete=isToday||!!ovR;
   if(canComplete&&!done){
-    html+='<button class="complete-btn" onclick="completeOn(\''+eR.id+'\',\''+tk+'\')">Completar sesión</button>';
+    html+='<div style="height:20px"></div>';
   }else if(done){
     html+='<div class="banner banner-done" style="margin:18px 0 0"><span style="color:var(--green-txt);font-size:13px">✓ Completado'+(log.durSecs?' · '+fmtDur(log.durSecs):'')+' </span></div>';
   }else{
@@ -663,6 +663,32 @@ function renderHoy(){
 
   html+='</div></div>';
   el.innerHTML=html;
+
+  // Barra fija con Cancelar + Completar
+  var fixedBar=document.getElementById('fixedCompleteBar');
+  if(canComplete&&!done){
+    if(!fixedBar){
+      fixedBar=document.createElement('div');
+      fixedBar.id='fixedCompleteBar';
+      document.querySelector('.app').appendChild(fixedBar);
+    }
+    fixedBar.style.display='flex';
+    fixedBar.innerHTML='';
+    var btnCancel=document.createElement('button');
+    btnCancel.className='fb-cancel';
+    btnCancel.textContent='Cancelar';
+    btnCancel.dataset.dayId=eR.id;btnCancel.dataset.tk=tk;
+    btnCancel.onclick=function(){askCancel(this.dataset.dayId,this.dataset.tk)};
+    var btnDone=document.createElement('button');
+    btnDone.className='fb-done';
+    btnDone.textContent='✓  Completar';
+    btnDone.dataset.dayId=eR.id;btnDone.dataset.tk=tk;
+    btnDone.onclick=function(){askComplete(this.dataset.dayId,this.dataset.tk)};
+    fixedBar.appendChild(btnCancel);
+    fixedBar.appendChild(btnDone);
+  }else{
+    if(fixedBar)fixedBar.style.display='none';
+  }
 }
 
 // IDs guardados para la confirmación
