@@ -24,7 +24,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   --r:10px;--r-sm:7px;--nav-h:64px;
 }
 .app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
-.scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h)+16px);padding-top:env(safe-area-inset-top,0)}
+.scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h)+90px);padding-top:env(safe-area-inset-top,0)}
 .scroll-area::-webkit-scrollbar{display:none}
 /* Nav */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:var(--nav-h);background:#0e0e0ecc;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:0.5px solid var(--border);display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0);z-index:50}
@@ -193,10 +193,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .empty-icon{font-size:36px;margin-bottom:12px}
 .empty-title{font-size:15px;font-weight:600;color:var(--subtle);margin-bottom:6px}
 .empty-sub{font-size:13px;line-height:1.5}
-/* Barra fija completar */
-#fixedCompleteBar{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:12px 20px;background:#0e0e0e;border-top:.5px solid #7f77dd;z-index:55;box-shadow:0 -4px 20px rgba(0,0,0,.6)}
-#fixedCompleteBar button{width:100%;padding:14px;border:none;border-radius:10px;background:#7f77dd;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .15s}
-#fixedCompleteBar button:active{opacity:.85}
+/* Barra fija completar + cancelar */
+#fixedCompleteBar{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:12px 16px;background:#0e0e0e;border-top:.5px solid #2a2a2a;z-index:55;box-shadow:0 -4px 20px rgba(0,0,0,.7);display:flex;gap:10px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0))}
+#fixedCompleteBar .fb-cancel{flex:0 0 auto;padding:14px 18px;border:.5px solid #383838;border-radius:10px;background:transparent;color:#888;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
+#fixedCompleteBar .fb-cancel:active{background:#1a1a1a}
+#fixedCompleteBar .fb-done{flex:1;padding:14px;border:none;border-radius:10px;background:#7f77dd;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .15s}
+#fixedCompleteBar .fb-done:active{opacity:.85}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
 input[type=number]{-moz-appearance:textfield}
 </style>
@@ -665,6 +667,41 @@ function renderHoy(){
 
 // IDs guardados para la confirmación
 var _pendingDayId=null,_pendingTk=null;
+
+function askCancel(dayId,tk){
+  var conf=document.getElementById('confirmBar');
+  if(conf){conf.remove();return}
+  _pendingDayId=dayId;_pendingTk=tk;
+  var bar=document.createElement('div');
+  bar.id='confirmBar';
+  bar.style.cssText='position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #d85a30;padding:14px 20px;z-index:60;display:flex;gap:10px;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,.8);padding-bottom:calc(14px + env(safe-area-inset-bottom,0))';
+  var txt=document.createElement('div');
+  txt.style.cssText='flex:1;font-size:13px;color:#e8e6e0;line-height:1.4';
+  txt.innerHTML='Cancelar y borrar todo<br>lo registrado hoy?';
+  var btnNo=document.createElement('button');
+  btnNo.textContent='No';
+  btnNo.style.cssText='padding:10px 16px;border:.5px solid #383838;border-radius:8px;background:transparent;color:#aaa;font-size:13px;font-family:inherit;cursor:pointer';
+  btnNo.onclick=function(){bar.remove()};
+  var btnYes=document.createElement('button');
+  btnYes.textContent='Sí, borrar';
+  btnYes.style.cssText='padding:10px 16px;border:none;border-radius:8px;background:#d85a30;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer';
+  btnYes.onclick=function(){bar.remove();doCancel(_pendingDayId)};
+  bar.appendChild(txt);bar.appendChild(btnNo);bar.appendChild(btnYes);
+  document.querySelector('.app').appendChild(bar);
+}
+
+function doCancel(dayId){
+  // Borrar sets de la sesión en curso de ese ejercicio-día
+  var keys=Object.keys(S.session);
+  keys.forEach(function(k){if(k.indexOf(dayId+'_')===0)delete S.session[k]});
+  // Detener y reiniciar cronómetros
+  stopSess();stopRest();
+  resetSessTimer();
+  S.restSavedSecs=0;S.restEndTs=null;
+  saveS();
+  renderHoy();
+  showToast('Entrenamiento reiniciado');
+}
 function askComplete(dayId,tk){
   _pendingDayId=dayId;_pendingTk=tk;
   var conf=document.getElementById('confirmBar');
