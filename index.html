@@ -24,7 +24,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
   --r:10px;--r-sm:7px;--nav-h:64px;
 }
 .app{max-width:430px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
-.scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h)+90px);padding-top:env(safe-area-inset-top,0)}
+.scroll-area{flex:1;overflow-y:auto;padding-bottom:calc(var(--nav-h) + 100px + env(safe-area-inset-bottom,0px));padding-top:env(safe-area-inset-top,0)}
 .scroll-area::-webkit-scrollbar{display:none}
 /* Nav */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:var(--nav-h);background:#0e0e0ecc;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:0.5px solid var(--border);display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0);z-index:50}
@@ -194,7 +194,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .empty-title{font-size:15px;font-weight:600;color:var(--subtle);margin-bottom:6px}
 .empty-sub{font-size:13px;line-height:1.5}
 /* Barra fija completar + cancelar */
-#fixedCompleteBar{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:12px 16px;background:#0e0e0e;border-top:.5px solid #2a2a2a;z-index:55;box-shadow:0 -4px 20px rgba(0,0,0,.7);display:flex;gap:10px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0))}
+#fixedCompleteBar{position:fixed;bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:12px 16px;background:#0e0e0e;border-top:.5px solid #2a2a2a;z-index:60;box-shadow:0 -6px 24px rgba(0,0,0,.85);display:flex;gap:10px}
 #fixedCompleteBar .fb-cancel{flex:0 0 auto;padding:14px 18px;border:.5px solid #383838;border-radius:10px;background:transparent;color:#888;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .15s}
 #fixedCompleteBar .fb-cancel:active{background:#1a1a1a}
 #fixedCompleteBar .fb-done{flex:1;padding:14px;border:none;border-radius:10px;background:#7f77dd;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:opacity .15s}
@@ -700,7 +700,7 @@ function askCancel(dayId,tk){
   _pendingDayId=dayId;_pendingTk=tk;
   var bar=document.createElement('div');
   bar.id='confirmBar';
-  bar.style.cssText='position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #d85a30;padding:14px 20px;z-index:60;display:flex;gap:10px;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,.8);padding-bottom:calc(14px + env(safe-area-inset-bottom,0))';
+  bar.style.cssText='position:fixed;bottom:calc(64px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #d85a30;padding:16px 20px;z-index:70;display:flex;gap:10px;align-items:center;box-shadow:0 -6px 24px rgba(0,0,0,.9)';
   var txt=document.createElement('div');
   txt.style.cssText='flex:1;font-size:13px;color:#e8e6e0;line-height:1.4';
   txt.innerHTML='Cancelar y borrar todo<br>lo registrado hoy?';
@@ -734,7 +734,7 @@ function askComplete(dayId,tk){
   if(conf){conf.remove();return}
   var bar=document.createElement('div');
   bar.id='confirmBar';
-  bar.style.cssText='position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #ba7517;padding:14px 20px;z-index:60;display:flex;gap:10px;align-items:center;box-shadow:0 -4px 20px rgba(0,0,0,.8)';
+  bar.style.cssText='position:fixed;bottom:calc(64px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #ba7517;padding:16px 20px;z-index:70;display:flex;gap:10px;align-items:center;box-shadow:0 -6px 24px rgba(0,0,0,.9)';
   var txt=document.createElement('div');
   txt.style.cssText='flex:1;font-size:13px;color:#e8e6e0;line-height:1.4';
   txt.innerHTML='Seguro que quieres<br>completar la sesión?';
