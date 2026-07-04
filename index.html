@@ -340,7 +340,25 @@ var S={streak:0,totalXP:0,session:{},logs:{},dayOverrides:{},sessStartTs:null,se
 function idbOpen(){return new Promise(function(ok,fail){var r=indexedDB.open('forge3',1);r.onupgradeneeded=function(e){e.target.result.createObjectStore('kv')};r.onsuccess=function(e){DB=e.target.result;ok()};r.onerror=fail})}
 function idbGet(k){return new Promise(function(ok){var t=DB.transaction('kv','readonly');var r=t.objectStore('kv').get(k);r.onsuccess=function(){ok(r.result||null)}})}
 function idbSet(k,v){return new Promise(function(ok){var t=DB.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=ok})}
-async function loadS(){var d=await idbGet('state3');if(d){S.streak=d.streak||0;S.totalXP=d.totalXP||0;S.session=d.session||{};S.logs=d.logs||{};S.dayOverrides=d.dayOverrides||{};S.sessStartTs=d.sessStartTs||null;S.sessAccum=d.sessAccum||0;S.restEndTs=d.restEndTs||null;S.restSavedSecs=d.restSavedSecs||0;S.pendingSession=d.pendingSession||null}}
+async function loadS(){
+  var d=await idbGet('state3');
+  if(d){
+    S.streak=d.streak||0;
+    S.totalXP=d.totalXP||0;
+    S.session=d.session||{};
+    S.logs=d.logs||{};
+    S.dayOverrides=d.dayOverrides||{};
+    S.sessStartTs=d.sessStartTs||null;
+    S.sessAccum=d.sessAccum||0;
+    S.restEndTs=d.restEndTs||null;
+    S.restSavedSecs=d.restSavedSecs||0;
+    S.pendingSession=d.pendingSession||null;
+  }
+  // Garantizar campos críticos aunque no haya datos guardados
+  if(!S.dayOverrides)S.dayOverrides={};
+  if(!S.session)S.session={};
+  if(!S.logs)S.logs={};
+}
 async function saveS(){await idbSet('state3',S)}
 
 // ═══════════════════════════════════════
@@ -452,18 +470,21 @@ function renderHeader(){
 // CALENDARIO
 // ═══════════════════════════════════════
 function renderCal(){
-  var today=peruNow();var tk=todayKey();var tdw=today.getUTCDay();
+  if(!document.getElementById('calStrip'))return;
+  var tk=todayKey();var tdw=peruNow().getUTCDay();
   var mondayOff=tdw===0?-6:1-tdw;
   var html='';
   for(var i=0;i<7;i++){
-    var d=new Date(today.getTime());d.setUTCDate(today.getUTCDate()+mondayOff+i);
+    // Calcular la fecha usando ms desde epoch para evitar desfases
+    var ms=Date.now()-5*3600*1000+(mondayOff+i)*86400*1000;
+    var d=new Date(ms);
     var dk=d.toISOString().slice(0,10);var dw=d.getUTCDay();
     var isToday=dk===tk;
     var isDone=!!(S.logs[dk]&&S.logs[dk].completed);
     var isPast=dk<tk;
     var isSelected=dk===(selectedDateKey||tk);
     var baseR=DOW_MAP[dw]?ROUTINE.find(function(x){return x.id===DOW_MAP[dw]}):null;
-    var ovId=S.dayOverrides[dk];
+    var ovId=S.dayOverrides?S.dayOverrides[dk]:undefined;
     var ovR=ovId?ROUTINE.find(function(x){return x.id===ovId}):null;
     var dispR=ovR||baseR;
     var tag=dispR?dispR.name:'REST';
@@ -505,6 +526,7 @@ function renderXP(){
 // HOY
 // ═══════════════════════════════════════
 function renderHoy(){
+  if(!document.getElementById('viewHoy'))return;
   var tk=selectedDateKey||todayKey();
   var isToday=tk===todayKey();
   var el=document.getElementById('viewHoy');
@@ -513,7 +535,7 @@ function renderHoy(){
   var log=S.logs[tk]||{};
   var done=!!log.completed;
   var baseR=DOW_MAP[selDow]?ROUTINE.find(function(x){return x.id===DOW_MAP[selDow]}):null;
-  var ovId=S.dayOverrides[tk];
+  var ovId=S.dayOverrides?S.dayOverrides[tk]:undefined;
   var ovR=ovId?ROUTINE.find(function(x){return x.id===ovId}):null;
   var pendR=isToday&&!ovR&&S.pendingSession?ROUTINE.find(function(x){return x.id===S.pendingSession}):null;
   var eR=ovR||pendR||baseR;
