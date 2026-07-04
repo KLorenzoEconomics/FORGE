@@ -75,6 +75,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .cal-day.done{border-color:var(--green);background:var(--green-bg)}
 .cal-day.today{border-color:var(--xp);background:var(--xp-bg)}
 .cal-day.rest-day{opacity:.4}
+.cal-day.missed{border-color:#d85a30;background:#2a1510}
+.cal-day.missed .cal-dow{color:#d85a30}
+.cal-day.missed .cal-num{color:#e07050}
+.cal-day.missed .cal-tag{background:#3a1a0e;color:#d85a30}
 .cal-day.upcoming{border-color:var(--border2)}
 .cal-day.selected{outline:2px solid var(--xp);outline-offset:1px}
 .cal-day.done.selected{outline-color:var(--green-txt)}
@@ -377,13 +381,39 @@ function todayRoutine(){return ROUTINE.find(function(r){return DOW_MAP[dow()]===
 function fmtDur(s){var h=Math.floor(s/3600);var m=Math.floor((s%3600)/60);var sec=s%60;if(h>0)return h+'h '+m+'m';if(m>0)return m+'m '+String(sec).padStart(2,'0')+'s';return s+'s'}
 function fmtDate(k){var p=k.split('-');return p[2]+'/'+p[1]+'/'+p[0].slice(2)}
 
+// Devuelve array de IDs de rutina ya completados en la semana actual (lun-dom)
+function completedThisWeek(){
+  var today=peruNow();var tdw=today.getUTCDay();
+  var mondayOff=tdw===0?-6:1-tdw;
+  var ids=[];
+  for(var i=0;i<7;i++){
+    var ms=Date.now()-5*3600*1000+(mondayOff+i)*86400*1000;
+    var d=new Date(ms);var dk=d.toISOString().slice(0,10);
+    if(S.logs[dk]&&S.logs[dk].completed&&S.logs[dk].dayId){
+      ids.push(S.logs[dk].dayId);
+    }
+  }
+  return ids;
+}
+
 function calcStreak(){
   var s=0;
-  for(var i=0;i<30;i++){
+  var tk=todayKey();
+  for(var i=0;i<60;i++){
     var d=peruNow();d.setUTCDate(d.getUTCDate()-i);
     var k=d.toISOString().slice(0,10);var dw=d.getUTCDay();
-    if(!DOW_MAP[dw])continue;
-    if(S.logs[k]&&S.logs[k].completed)s++;else break;
+    // ¿Este día tenía sesión programada? (rutina base O reprogramación manual)
+    var teniaSesion=!!DOW_MAP[dw] || (S.dayOverrides && S.dayOverrides[k]);
+    if(!teniaSesion)continue; // descanso/domingo no rompe ni suma racha
+    var completado=S.logs[k] && S.logs[k].completed;
+    if(completado){
+      s++;
+    }else{
+      // Si es HOY y aún no entrenas, no rompe la racha (el día no ha terminado)
+      if(k===tk){continue}
+      // Día pasado sin completar: rompe la racha
+      break;
+    }
   }
   S.streak=s;
 }
@@ -497,13 +527,17 @@ function renderCal(){
     var ovR=ovId?ROUTINE.find(function(x){return x.id===ovId}):null;
     var dispR=ovR||baseR;
     var tag=dispR?dispR.name:'REST';
+    var esDom=dw===0;
+    // Un día pasado que tenía sesión (no descanso/domingo) y NO se completó = perdido (rojo)
+    var isMissed=isPast && !isDone && dispR && !esDom;
     var cls='cal-day';
     if(isDone)cls+=' done';
     else if(isToday)cls+=' today';
+    else if(isMissed)cls+=' missed';
     else if(!dispR)cls+=' rest-day';
     else if(!isPast)cls+=' upcoming';
     if(isSelected)cls+=' selected';
-    var check=isDone?'<div class="cal-check">✓</div>':'';
+    var check=isDone?'<div class="cal-check">✓</div>':(isMissed?'<div class="cal-check" style="color:#d85a30">✗</div>':'');
     html+='<div class="'+cls+'" onclick="selectDay(\''+dk+'\')">'
       +check
       +'<div class="cal-dow">'+DAY_ABR[dw]+'</div>'
@@ -551,7 +585,13 @@ function renderHoy(){
 
   var html='<div style="padding:4px 0"></div>';
 
-  // Banner de navegación (día no-hoy)
+  var esDomingo=selDow===0;
+  var esSabado=selDow===6;
+  // Un día es "reprogramable" si: no está completado, no es domingo.
+  // Sábado sí es reprogramable (el gym abre) aunque por defecto sea descanso.
+  var puedeReprogramar=!done && !esDomingo;
+
+  // Banner para días NAVEGADOS (no hoy)
   if(!isToday){
     var parts=tk.split('-');var label=DAY_ABR[selDow]+' '+parseInt(parts[2])+'/'+parseInt(parts[1]);
     var ovTag=ovR?' · <span style="color:var(--gold)">reprogramado</span>':'';
@@ -560,16 +600,25 @@ function renderHoy(){
       +'<div style="font-size:12px;color:var(--muted)">📅 <b style="color:var(--text)">'+label+'</b>'+ovTag+'</div>'
       +'<button onclick="selectedDateKey=null;renderHoy();renderCal();" style="background:var(--xp-bg);border:.5px solid var(--xp-dim);color:var(--xp);border-radius:var(--r-sm);padding:6px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Hoy</button>'
       +'</div>';
-    if(!done){
-      html+='<div class="session-btns">';
-      ROUTINE.forEach(function(ro){
-        var active=(ovId||DOW_MAP[selDow])===ro.id;
-        html+='<button class="session-btn'+(active?' active':'')+'" onclick="assignSession(\''+tk+'\',\''+ro.id+'\')">'+ro.name+'</button>';
-      });
-      html+='<button class="session-btn" onclick="assignSession(\''+tk+'\',null)">REST</button>';
-      html+='</div>';
+    var esPasado=tk<todayKey();
+    if(done){
+      html+='<div style="font-size:11px;color:var(--green-txt);margin-top:6px">✓ Sesión ya completada este día — no editable</div>';
+    }else if(esDomingo){
+      html+='<div style="font-size:11px;color:var(--muted);margin-top:6px">🛌 Domingo es día de descanso</div>';
+    }else if(esPasado){
+      html+='<div style="font-size:11px;color:#d85a30;margin-top:6px">✗ Día pasado sin completar — ya no se puede entrenar</div>';
+    }else{
+      html+=sessionButtonsHTML(tk,ovId,selDow);
     }
     html+='</div>';
+  }
+
+  // Banner de reprogramación para HOY cuando es sábado (descanso pero gym abre) sin sesión asignada
+  if(isToday && esSabado && !ovR && !done){
+    html+='<div class="banner banner-nav">'
+      +'<div style="font-size:12px;color:var(--gold);margin-bottom:8px">🏋️ Hoy es sábado — ¿vas a entrenar? Elige la sesión:</div>'
+      +sessionButtonsHTML(tk,ovId,selDow)
+      +'</div>';
   }
 
   // Sin sesión y sin pendiente
@@ -605,8 +654,9 @@ function renderHoy(){
   html+='</div>';
   html+='<div class="session-body">';
 
-  // Timers solo si es hoy y no completado
-  if(isToday&&!done){
+  // Timers cuando se puede entrenar ahora (hoy o día reprogramado) y no completada
+  var showTimers=(isToday||!!ovR)&&!done;
+  if(showTimers){
     html+='<div class="dual-timer">';
     html+='<div class="timer-block"><div class="timer-lbl">Descanso</div>'
       +'<div id="restDisp" class="timer-dig'+(rs<=10&&rs>0?' urg':' xp')+'">'+rm+':'+rsec+'</div>'
@@ -652,7 +702,7 @@ function renderHoy(){
   });
 
   // Botón completar
-  var canComplete=isToday||!!ovR;
+  var canComplete=isToday;  // Solo se puede completar el día actual, no días pasados
   if(canComplete&&!done){
     html+='<div style="height:20px"></div>';
   }else if(done){
@@ -724,9 +774,18 @@ function doCancel(dayId){
   stopSess();stopRest();
   resetSessTimer();
   S.restSavedSecs=0;S.restEndTs=null;
+  // Si el día actual tenía una sesión reprogramada, quitarla para poder elegir de nuevo
+  var tk=todayKey();
+  if(S.dayOverrides && S.dayOverrides[tk]){
+    delete S.dayOverrides[tk];
+  }
+  // Si había una sesión pendiente recuperada, también limpiarla
+  if(S.pendingSession){
+    S.pendingSession=null;
+  }
   saveS();
-  renderHoy();
-  showToast('Entrenamiento reiniciado');
+  renderHoy();renderCal();
+  showToast('Entrenamiento cancelado');
 }
 function askComplete(dayId,tk){
   _pendingDayId=dayId;_pendingTk=tk;
@@ -737,7 +796,7 @@ function askComplete(dayId,tk){
   bar.style.cssText='position:fixed;bottom:calc(64px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#1a1a1a;border-top:0.5px solid #ba7517;padding:16px 20px;z-index:70;display:flex;gap:10px;align-items:center;box-shadow:0 -6px 24px rgba(0,0,0,.9)';
   var txt=document.createElement('div');
   txt.style.cssText='flex:1;font-size:13px;color:#e8e6e0;line-height:1.4';
-  txt.innerHTML='Seguro que quieres<br>completar la sesión?';
+  txt.innerHTML='Seguro que quieres<br>registrar este entrenamiento?';
   var btnCancel=document.createElement('button');
   btnCancel.textContent='Cancelar';
   btnCancel.style.cssText='padding:10px 16px;border:.5px solid #383838;border-radius:8px;background:transparent;color:#aaa;font-size:13px;font-family:inherit;cursor:pointer';
@@ -808,7 +867,44 @@ function showCompleteSplash(dayId,xp,dur){
 // ═══════════════════════════════════════
 // ASSIGN / MISS
 // ═══════════════════════════════════════
+// Genera los botones de sesión para reprogramar, ocultando las ya hechas esta semana
+function sessionButtonsHTML(tk,ovId,selDow){
+  var yaHechas=completedThisWeek();
+  var h='<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Toca para elegir · toca de nuevo para quitar</div>';
+  h+='<div class="session-btns">';
+  ROUTINE.forEach(function(ro){
+    // Ocultar sesiones ya completadas esta semana (salvo la asignada a este día)
+    if(yaHechas.indexOf(ro.id)>=0 && ovId!==ro.id){return}
+    var active=ovId===ro.id;
+    // Si ya está activa, tocarla la deselecciona (toggle)
+    var action=active?"toggleSession('"+tk+"','"+ro.id+"')":"assignSession('"+tk+"','"+ro.id+"')";
+    h+='<button class="session-btn'+(active?' active':'')+'" onclick="'+action+'">'+ro.name+(active?' ✓':'')+'</button>';
+  });
+  h+='</div>';
+  return h;
+}
+
+// Toggle: si tocas la sesión ya asignada, la quita
+function toggleSession(tk,routineId){
+  if(S.dayOverrides&&S.dayOverrides[tk]===routineId){
+    delete S.dayOverrides[tk];
+    saveS();renderHoy();renderCal();
+    showToast('Sesión quitada');
+  }else{
+    assignSession(tk,routineId);
+  }
+}
+
 function assignSession(dk,routineId){
+  // Domingo nunca se puede reprogramar (solo descanso)
+  var d=new Date(dk+'T12:00:00Z');
+  if(d.getUTCDay()===0){showToast('Domingo es día de descanso');return}
+  // No reprogramar un día ya completado
+  if(S.logs[dk]&&S.logs[dk].completed){showToast('Ese día ya fue completado');return}
+  // No asignar una sesión que ya se completó esta semana (evita duplicar)
+  if(routineId&&completedThisWeek().indexOf(routineId)>=0){
+    showToast('Esa sesión ya la completaste esta semana');return;
+  }
   if(!S.dayOverrides)S.dayOverrides={};
   if(routineId===null){delete S.dayOverrides[dk]}else{S.dayOverrides[dk]=routineId}
   saveS();renderHoy();renderCal();
@@ -882,6 +978,14 @@ async function init(){
   showSplash();
   try{
     await idbOpen();await loadS();calcStreak();
+    // Limpiar overrides inválidos: domingos no deben tener sesión asignada
+    if(S.dayOverrides){
+      Object.keys(S.dayOverrides).forEach(function(dk){
+        var d=new Date(dk+'T12:00:00Z');
+        if(d.getUTCDay()===0)delete S.dayOverrides[dk];
+      });
+      saveS();
+    }
     if(S.sessStartTs){sessRunning=true;sessInt=setInterval(refreshSessDisp,1000)}
     if(S.restEndTs&&Date.now()<S.restEndTs){restRunning=true;restInt=setInterval(refreshRestDisp,1000)}
     else{S.restEndTs=null;S.restSavedSecs=0}
