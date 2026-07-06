@@ -381,6 +381,65 @@ function todayRoutine(){return ROUTINE.find(function(r){return DOW_MAP[dow()]===
 function fmtDur(s){var h=Math.floor(s/3600);var m=Math.floor((s%3600)/60);var sec=s%60;if(h>0)return h+'h '+m+'m';if(m>0)return m+'m '+String(sec).padStart(2,'0')+'s';return s+'s'}
 function fmtDate(k){var p=k.split('-');return p[2]+'/'+p[1]+'/'+p[0].slice(2)}
 
+
+// ═══════════════════════════════════════
+// IMPORTACIÓN ÚNICA de datos históricos (semana 29jun-5jul)
+// ═══════════════════════════════════════
+function importHistoricalData(){
+  // Marca para no reimportar
+  if(S._importedWeek1)return;
+
+  function mkSet(kg,reps,rir){return {kg:String(kg),reps:String(reps),rir:rir,tick:true};}
+
+  // ── LEGS — jueves 2/07/2026 (movido del miércoles) ──
+  var legsSession={};
+  // Hack Squat (ei=0)
+  legsSession['legs_0_0']=mkSet(60,10,2);
+  legsSession['legs_0_1']=mkSet(80,10,1);
+  legsSession['legs_0_2']=mkSet(100,9,0);
+  legsSession['legs_0_3']=mkSet(100,9,0);
+  // Leg Press (ei=1)
+  legsSession['legs_1_0']=mkSet(20,12,1);
+  legsSession['legs_1_1']=mkSet(20,12,0);
+  legsSession['legs_1_2']=mkSet(20,12,0);
+  // Leg Extension (ei=2)
+  legsSession['legs_2_0']=mkSet(15,10,0);
+  legsSession['legs_2_1']=mkSet(15,8,0);
+  // Leg Curl sentado (ei=3)
+  legsSession['legs_3_0']=mkSet(45,10,2);
+  legsSession['legs_3_1']=mkSet(50,9,0);
+  legsSession['legs_3_2']=mkSet(50,8,0);
+  // Gemelo de pie (ei=4)
+  legsSession['legs_4_0']=mkSet(100,12,0);
+  legsSession['legs_4_1']=mkSet(120,15,0);
+  legsSession['legs_4_2']=mkSet(120,13,0);
+  S.logs['2026-07-02']={completed:true,session:legsSession,dayId:'legs',ts:new Date('2026-07-02T23:00:00Z').getTime(),durSecs:55*60};
+
+  // ── UPPER — viernes 3/07/2026 (movido del jueves) ──
+  var upperSession={};
+  // Elevación lateral (ei=0)
+  upperSession['upper_0_0']=mkSet(7.5,16,1);
+  upperSession['upper_0_1']=mkSet(7.5,15,0);
+  upperSession['upper_0_2']=mkSet(7.5,15,0);
+  upperSession['upper_0_3']=mkSet(7.5,16,0);
+  // Press inclinado mancuernas (ei=1)
+  upperSession['upper_1_0']=mkSet(25,8,1);
+  upperSession['upper_1_1']=mkSet(30,8,0);
+  upperSession['upper_1_2']=mkSet(30,8,0);
+  // Jalón agarre neutro (ei=2)
+  upperSession['upper_2_0']=mkSet(50,10,1);
+  upperSession['upper_2_1']=mkSet(55,8,0);
+  upperSession['upper_2_2']=mkSet(55,10,0);
+  // Remo cable sentado (ei=3) — vacío, no registrado
+  // Curl predicador máquina (ei=4)
+  upperSession['upper_4_0']=mkSet(45,10,1);
+  upperSession['upper_4_1']=mkSet(45,8,0);
+  S.logs['2026-07-03']={completed:true,session:upperSession,dayId:'upper',ts:new Date('2026-07-03T23:00:00Z').getTime(),durSecs:52*60};
+
+  S._importedWeek1=true;
+  saveS();
+}
+
 // Devuelve array de IDs de rutina ya completados en la semana actual (lun-dom)
 function completedThisWeek(){
   var today=peruNow();var tdw=today.getUTCDay();
@@ -687,8 +746,8 @@ function renderHoy(){
       var dis=done?'disabled':'';
       html+='<div class="set-row">';
       html+='<div class="set-n">S'+(si+1)+'</div>';
-      html+='<input class="set-inp'+(filled?' ok':'')+'" type="number" step="0.5" placeholder="kg" value="'+sv.kg+'" '+dis+' oninput="upd(\''+eR.id+'\','+ei+','+si+',\'kg\',this.value);this.classList.toggle(\'ok\',this.value!==\'\')">';
-      html+='<input class="set-inp'+(filled?' ok':'')+'" type="number" placeholder="reps" value="'+sv.reps+'" '+dis+' oninput="upd(\''+eR.id+'\','+ei+','+si+',\'reps\',this.value);this.classList.toggle(\'ok\',this.value!==\'\')">';
+      html+='<input class="set-inp'+(filled?' ok':'')+'" type="number" step="0.5" placeholder="kg" value="'+sv.kg+'" '+dis+' oninput="upd(\''+eR.id+'\','+ei+','+si+',\'kg\',this.value);this.classList.toggle(\'ok\',this.value!==\'\')" onblur="refreshRefLine(\''+eR.id+'\','+ei+','+si+')">';
+      html+='<input class="set-inp'+(filled?' ok':'')+'" type="number" placeholder="reps" value="'+sv.reps+'" '+dis+' oninput="upd(\''+eR.id+'\','+ei+','+si+',\'reps\',this.value);this.classList.toggle(\'ok\',this.value!==\'\')" onblur="refreshRefLine(\''+eR.id+'\','+ei+','+si+')">';
       if(rir>=0){
         html+='<select class="rir-sel" onchange="upd(\''+eR.id+'\','+ei+','+si+',\'rir\',this.value)" '+dis+'>';
         [3,2,1,0].forEach(function(v){html+='<option value="'+v+'"'+(sv.rir==v?' selected':'')+'>'+v+'</option>'});
@@ -697,6 +756,28 @@ function renderHoy(){
       html+='<div class="set-tick'+(sv.tick?' ticked':'')+'" onclick="'+(done?'':'tickSet(\''+eR.id+'\','+ei+','+si+')')+'">'+(sv.tick?'✓':'')+'</div>';
       html+='</div>';
       if(isPR)html+='<div class="pr-flag">🏆 PR nuevo</div>';
+      // Referencia de la semana pasada (solo si estamos entrenando hoy y no completado)
+      if(!done){
+        var prev=getPrevSet(eR.id,ei,si);
+        if(prev&&prev.kg){
+          var refTxt='Ant: '+prev.kg+'kg × '+prev.reps+'rep';
+          if(prev.rir!==''&&prev.rir!=null)refTxt+=' RIR'+prev.rir;
+          // Comparar si el usuario ya llenó este set
+          var arrow='';
+          if(sv.kg!==''&&sv.kg!=null){
+            var curKg=parseFloat(sv.kg),prevKg=parseFloat(prev.kg);
+            var curReps=parseFloat(sv.reps||0),prevReps=parseFloat(prev.reps||0);
+            if(curKg>prevKg||(curKg===prevKg&&curReps>prevReps)){
+              arrow=' <span style="color:#7ac94a">⬆ subiste</span>';
+            }else if(curKg<prevKg||(curKg===prevKg&&curReps<prevReps)){
+              arrow=' <span style="color:#d85a30">⬇ bajaste</span>';
+            }else if(curKg===prevKg&&curReps===prevReps){
+              arrow=' <span style="color:#666">= igual</span>';
+            }
+          }
+          html+='<div id="ref_'+eR.id+'_'+ei+'_'+si+'" style="font-size:10px;color:#888;padding-left:33px;margin:-2px 0 6px">'+refTxt+arrow+'</div>';
+        }
+      }
     });
     html+='</div>';
   });
@@ -809,6 +890,35 @@ function askComplete(dayId,tk){
   document.querySelector('.app').appendChild(bar);
 }
 
+
+// Busca el registro MÁS RECIENTE anterior a hoy de un ejercicio-set específico
+// Busca el registro anterior del MISMO EJERCICIO (por nombre) en cualquier rutina
+function getPrevSet(dayId,ei,si){
+  var tk=todayKey();
+  // Nombre del ejercicio actual
+  var curRoutine=ROUTINE.find(function(x){return x.id===dayId});
+  if(!curRoutine||!curRoutine.exercises[ei])return null;
+  var exName=curRoutine.exercises[ei].n;
+  var best=null;var bestDate='';
+  Object.keys(S.logs).forEach(function(date){
+    if(date>=tk)return; // solo días anteriores a hoy
+    var log=S.logs[date];
+    if(!log.completed||!log.session||!log.dayId)return;
+    // Buscar ese ejercicio por nombre dentro de la rutina de ese log
+    var logRoutine=ROUTINE.find(function(x){return x.id===log.dayId});
+    if(!logRoutine)return;
+    var exIdx=-1;
+    logRoutine.exercises.forEach(function(e,idx){if(e.n===exName)exIdx=idx});
+    if(exIdx<0)return; // ese día no tenía este ejercicio
+    var k=log.dayId+'_'+exIdx+'_'+si;
+    var v=log.session[k];
+    if(v&&v.kg!==''&&v.kg!=null){
+      if(date>bestDate){bestDate=date;best=v;}
+    }
+  });
+  return best;
+}
+
 function dayColor(id){return{push:'#9d96e8',pull:'#4dc9a0',legs:'#e07050',upper:'#8884cc',lower:'#ccaa44'}[id]||'#7f77dd'}
 function xpForDay(){var b=80;if(S.streak>=14)b+=20;else if(S.streak>=7)b+=10;return b}
 
@@ -819,6 +929,26 @@ function upd(dayId,ei,si,field,val){
   var k=dayId+'_'+ei+'_'+si;
   if(!S.session[k]){var r=ROUTINE.find(function(x){return x.id===dayId});var rir=r.exercises[ei].rirs[si];S.session[k]={kg:'',reps:'',rir:rir>=0?rir:'',tick:false}}
   S.session[k][field]=val;saveS();
+}
+// Actualiza la línea de referencia (⬆/⬇) sin re-renderizar todo
+function refreshRefLine(dayId,ei,si){
+  var el=document.getElementById('ref_'+dayId+'_'+ei+'_'+si);
+  if(!el)return;
+  var prev=getPrevSet(dayId,ei,si);
+  if(!prev||!prev.kg)return;
+  var k=dayId+'_'+ei+'_'+si;
+  var sv=S.session[k]||{kg:'',reps:''};
+  var refTxt='Ant: '+prev.kg+'kg × '+prev.reps+'rep';
+  if(prev.rir!==''&&prev.rir!=null)refTxt+=' RIR'+prev.rir;
+  var arrow='';
+  if(sv.kg!==''&&sv.kg!=null){
+    var curKg=parseFloat(sv.kg),prevKg=parseFloat(prev.kg);
+    var curReps=parseFloat(sv.reps||0),prevReps=parseFloat(prev.reps||0);
+    if(curKg>prevKg||(curKg===prevKg&&curReps>prevReps)){arrow=' <span style="color:#7ac94a">⬆ subiste</span>';}
+    else if(curKg<prevKg||(curKg===prevKg&&curReps<prevReps)){arrow=' <span style="color:#d85a30">⬇ bajaste</span>';}
+    else if(curKg===prevKg&&curReps===prevReps){arrow=' <span style="color:#666">= igual</span>';}
+  }
+  el.innerHTML=refTxt+arrow;
 }
 function tickSet(dayId,ei,si){
   var k=dayId+'_'+ei+'_'+si;
@@ -974,10 +1104,100 @@ function showSplash(){
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
+
+// ═══════════════════════════════════════
+// SEED DE DATOS HISTÓRICOS (una sola vez)
+// ═══════════════════════════════════════
+function seedHistoricalData(){
+  if(S._seededV3)return; // ya se sembró v3, no repetir
+  // Limpiar logs/overrides corruptos de las pruebas para que la racha sea real.
+  // Solo conservamos los días reales de la semana pasada + cualquier día futuro real.
+  var diasReales=['2026-06-29','2026-06-30','2026-07-02','2026-07-03','2026-07-04'];
+  var logsLimpios={};
+  Object.keys(S.logs||{}).forEach(function(dk){
+    // Conservar días reales sembrados y cualquier día desde hoy en adelante (entrenamientos nuevos)
+    if(diasReales.indexOf(dk)>=0 || dk>=todayKey()){logsLimpios[dk]=S.logs[dk];}
+  });
+  S.logs=logsLimpios;
+  // Limpiar overrides viejos también
+  S.dayOverrides={};
+  var legsSession={"legs_0_0": {"kg": "60", "reps": "10", "rir": 2, "tick": true}, "legs_0_1": {"kg": "80", "reps": "10", "rir": 1, "tick": true}, "legs_0_2": {"kg": "100", "reps": "9", "rir": 0, "tick": true}, "legs_0_3": {"kg": "100", "reps": "9", "rir": 0, "tick": true}, "legs_1_0": {"kg": "20", "reps": "12", "rir": 1, "tick": true}, "legs_1_1": {"kg": "20", "reps": "12", "rir": 0, "tick": true}, "legs_1_2": {"kg": "20", "reps": "12", "rir": 0, "tick": true}, "legs_2_0": {"kg": "15", "reps": "10", "rir": 0, "tick": true}, "legs_2_1": {"kg": "15", "reps": "8", "rir": 0, "tick": true}, "legs_3_0": {"kg": "45", "reps": "10", "rir": 2, "tick": true}, "legs_3_1": {"kg": "50", "reps": "9", "rir": 0, "tick": true}, "legs_3_2": {"kg": "50", "reps": "8", "rir": 0, "tick": true}, "legs_4_0": {"kg": "100", "reps": "12", "rir": 0, "tick": true}, "legs_4_1": {"kg": "120", "reps": "15", "rir": 0, "tick": true}, "legs_4_2": {"kg": "120", "reps": "13", "rir": 0, "tick": true}};
+  var upperSession={"upper_0_0": {"kg": "7.5", "reps": "16", "rir": 1, "tick": true}, "upper_0_1": {"kg": "7.5", "reps": "15", "rir": 0, "tick": true}, "upper_0_2": {"kg": "7.5", "reps": "15", "rir": 0, "tick": true}, "upper_0_3": {"kg": "7.5", "reps": "16", "rir": 0, "tick": true}, "upper_1_0": {"kg": "25", "reps": "8", "rir": 1, "tick": true}, "upper_1_1": {"kg": "30", "reps": "8", "rir": 0, "tick": true}, "upper_1_2": {"kg": "30", "reps": "8", "rir": 0, "tick": true}, "upper_2_0": {"kg": "50", "reps": "10", "rir": 1, "tick": true}, "upper_2_1": {"kg": "55", "reps": "8", "rir": 0, "tick": true}, "upper_2_2": {"kg": "55", "reps": "10", "rir": 0, "tick": true}, "upper_4_0": {"kg": "45", "reps": "10", "rir": 1, "tick": true}, "upper_4_1": {"kg": "45", "reps": "8", "rir": 0, "tick": true}};
+  // LEGS el jueves 2/07 (miércoles reprogramado)
+  if(!S.logs['2026-07-02']){
+    S.logs['2026-07-02']={completed:true,session:legsSession,dayId:'legs',ts:new Date('2026-07-02T18:00:00Z').getTime(),durSecs:3300};
+  }
+  // UPPER el viernes 3/07 (jueves reprogramado)
+  if(!S.logs['2026-07-03']){
+    S.logs['2026-07-03']={completed:true,session:upperSession,dayId:'upper',ts:new Date('2026-07-03T18:00:00Z').getTime(),durSecs:3120};
+  }
+  // PUSH lunes 29/06
+  if(!S.logs['2026-06-29']){
+    S.logs['2026-06-29']={completed:true,session:{"push_0_0": {"kg": "50", "reps": "9", "rir": 1, "tick": true}, "push_0_1": {"kg": "50", "reps": "8", "rir": 1, "tick": true}, "push_0_2": {"kg": "60", "reps": "6", "rir": 0, "tick": true}, "push_0_3": {"kg": "60", "reps": "8", "rir": 0, "tick": true}, "push_1_0": {"kg": "50", "reps": "12", "rir": 1, "tick": true}, "push_1_1": {"kg": "50", "reps": "12", "rir": 0, "tick": true}, "push_1_2": {"kg": "50", "reps": "10", "rir": 0, "tick": true}, "push_2_0": {"kg": "10", "reps": "15", "rir": 1, "tick": true}, "push_2_1": {"kg": "10", "reps": "12", "rir": 0, "tick": true}, "push_2_2": {"kg": "10", "reps": "28", "rir": 0, "tick": true}, "push_3_0": {"kg": "30", "reps": "12", "rir": 1, "tick": true}, "push_3_1": {"kg": "25", "reps": "11", "rir": 0, "tick": true}, "push_3_2": {"kg": "25", "reps": "10", "rir": 0, "tick": true}},dayId:'push',ts:new Date('2026-06-29T18:00:00Z').getTime(),durSecs:3311};
+  }
+  // PULL martes 30/06 (se registró tarde el 01/07, lo dejamos en su día real: martes 30)
+  if(!S.logs['2026-06-30']){
+    S.logs['2026-06-30']={completed:true,session:{"pull_0_0": {"kg": "30", "reps": "8", "rir": 2, "tick": true}, "pull_0_1": {"kg": "35", "reps": "7", "rir": 1, "tick": true}, "pull_0_2": {"kg": "35", "reps": "6", "rir": 0, "tick": true}, "pull_1_0": {"kg": "20", "reps": "12", "rir": 3, "tick": true}, "pull_1_1": {"kg": "30", "reps": "12", "rir": 3, "tick": true}, "pull_1_2": {"kg": "60", "reps": "7", "rir": 0, "tick": true}, "pull_1_3": {"kg": "60", "reps": "6", "rir": 0, "tick": true}, "pull_2_0": {"kg": "40", "reps": "15", "rir": 1, "tick": true}, "pull_2_1": {"kg": "45", "reps": "13", "rir": 0, "tick": true}, "pull_3_0": {"kg": "30", "reps": "10", "rir": 1, "tick": true}, "pull_3_1": {"kg": "30", "reps": "9", "rir": 0, "tick": true}, "pull_3_2": {"kg": "30", "reps": "9", "rir": 0, "tick": true}, "pull_4_0": {"kg": "20", "reps": "12", "rir": 1, "tick": true}, "pull_4_1": {"kg": "20", "reps": "13", "rir": 0, "tick": true}, "pull_4_2": {"kg": "20", "reps": "13", "rir": 0, "tick": true}},dayId:'pull',ts:new Date('2026-06-30T20:00:00Z').getTime(),durSecs:9180};
+  }
+  // LOWER sábado 4/07
+  if(!S.logs['2026-07-04']){
+    S.logs['2026-07-04']={completed:true,session:{"lower_0_0": {"reps": "10", "tick": true, "kg": "45", "rir": 1}, "lower_0_1": {"reps": "9", "tick": true, "kg": "45", "rir": 0}, "lower_0_2": {"reps": "10", "tick": true, "kg": "45", "rir": 0}, "lower_0_3": {"reps": "6", "tick": true, "kg": "50", "rir": 0}, "lower_1_0": {"reps": "12", "tick": true, "kg": "50", "rir": 1}, "lower_1_1": {"reps": "10", "tick": true, "kg": "50", "rir": 0}, "lower_1_2": {"reps": "10", "tick": true, "kg": "60", "rir": 0}, "lower_2_0": {"reps": "16", "tick": true, "kg": "60", "rir": 1}, "lower_2_1": {"reps": "12", "tick": true, "kg": "70", "rir": 0}, "lower_3_0": {"reps": "15", "tick": true, "kg": "20", "rir": 0}, "lower_3_1": {"reps": "15", "tick": true, "kg": "20", "rir": 0}, "lower_3_2": {"reps": "12", "tick": true, "kg": "30", "rir": 0}, "lower_4_0": {"reps": "20", "tick": true, "kg": "", "rir": ""}, "lower_4_1": {"reps": "20", "tick": true, "kg": "", "rir": ""}, "lower_4_2": {"reps": "20", "tick": true, "kg": "", "rir": ""}},dayId:'lower',ts:new Date('2026-07-04T18:00:00Z').getTime(),durSecs:2700};
+  }
+  // Overrides de reprogramación de la semana pasada (para que la racha cuente bien)
+  if(!S.dayOverrides)S.dayOverrides={};
+  S.dayOverrides['2026-07-02']='legs';
+  S.dayOverrides['2026-07-03']='upper';
+  S.dayOverrides['2026-07-04']='lower';
+  S._seededV3=true;
+  S._seededV2=true;
+  S._seededV1=true;
+  saveS();
+}
+
+
+// ═══════════════════════════════════════
+// DIAGNÓSTICO EN CONSOLA
+// ═══════════════════════════════════════
+function diagnostico(){
+  console.log('%c═══════ FORGE DIAGNÓSTICO ═══════','color:#7f77dd;font-weight:bold;font-size:14px');
+  console.log('Fecha hoy (Perú):', todayKey());
+  console.log('Racha calculada:', S.streak);
+  console.log('Seed ejecutado (v3):', S._seededV3===true);
+  console.log('');
+  
+  // Listar días históricos con sus sesiones
+  var dias=Object.keys(S.logs||{}).filter(function(k){return k<todayKey()}).sort();
+  console.log('%c── DÍAS HISTÓRICOS CARGADOS: '+dias.length+' ──','color:#7ac94a;font-weight:bold');
+  dias.forEach(function(dk){
+    var log=S.logs[dk];
+    var nSets=Object.keys(log.session||{}).length;
+    console.log('  '+dk+' → '+(log.dayId||'?').toUpperCase()+' ('+nSets+' sets registrados)');
+  });
+  console.log('');
+  
+  // Mostrar qué referencia tendría CADA ejercicio de HOY
+  var r=todayRoutine();
+  if(r){
+    console.log('%c── REFERENCIA PARA HOY ('+r.name+') ──','color:#ba7517;font-weight:bold');
+    r.exercises.forEach(function(ex,ei){
+      console.log('  '+ex.n+':');
+      ex.rirs.forEach(function(rir,si){
+        var prev=getPrevSet(r.id,ei,si);
+        if(prev&&prev.kg){
+          console.log('    S'+(si+1)+' → Ant: '+prev.kg+'kg × '+prev.reps+'rep RIR'+prev.rir);
+        }else{
+          console.log('    S'+(si+1)+' → SIN REFERENCIA');
+        }
+      });
+    });
+  }
+  console.log('%c═══════════════════════════════','color:#7f77dd;font-weight:bold');
+}
+
 async function init(){
   showSplash();
   try{
-    await idbOpen();await loadS();calcStreak();
+    await idbOpen();await loadS();seedHistoricalData();calcStreak();
     // Limpiar overrides inválidos: domingos no deben tener sesión asignada
     if(S.dayOverrides){
       Object.keys(S.dayOverrides).forEach(function(dk){
@@ -991,6 +1211,10 @@ async function init(){
     else{S.restEndTs=null;S.restSavedSecs=0}
   }catch(e){console.warn('Init error:',e);S={streak:0,totalXP:0,session:{},logs:{},dayOverrides:{},sessStartTs:null,sessAccum:0,restEndTs:null,restSavedSecs:0,pendingSession:null}}
   renderHeader();renderXP();renderCal();renderHoy();
+  // ═══ DIAGNÓSTICO DETALLADO EN CONSOLA ═══
+  diagnostico();
+  var nHist=Object.keys(S.logs||{}).filter(function(k){return k<todayKey()}).length;
+  if(nHist>0){setTimeout(function(){showToast('✓ '+nHist+' días de historial · racha '+S.streak);},2500);}
   if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
   document.addEventListener('visibilitychange',function(){if(!document.hidden){refreshSessDisp();refreshRestDisp()}});
 }
