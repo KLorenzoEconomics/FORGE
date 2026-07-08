@@ -28,9 +28,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .scroll-area::-webkit-scrollbar{display:none}
 /* Nav */
 .nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:var(--nav-h);background:#0e0e0ecc;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:0.5px solid var(--border);display:flex;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0);z-index:50}
-.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:var(--muted);font-size:10px;letter-spacing:.5px;text-transform:uppercase;border:none;background:transparent;transition:color .15s}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--muted);font-size:9px;letter-spacing:.3px;text-transform:uppercase;border:none;background:transparent;transition:color .15s}
 .nav-tab.active{color:var(--xp)}
-.nav-icon{font-size:20px;line-height:1}
+.nav-icon{font-size:19px;line-height:1}
 /* Splash */
 .splash{position:fixed;inset:0;background:#0a0a0a;display:flex;align-items:center;justify-content:center;z-index:500;transition:opacity .6s ease}
 .splash.hide{opacity:0;pointer-events:none}
@@ -244,11 +244,13 @@ input[type=number]{-moz-appearance:textfield}
     <div class="divider"></div>
     <div id="viewHoy"></div>
     <div id="viewHistorial" style="display:none"></div>
+    <div id="viewDieta" style="display:none"></div>
     <div id="viewStats" style="display:none"></div>
   </div>
   <nav class="nav">
     <button class="nav-tab active" id="navHoy" onclick="goTab('hoy')"><span class="nav-icon">⚡</span>Hoy</button>
     <button class="nav-tab" id="navHistorial" onclick="goTab('historial')"><span class="nav-icon">📋</span>Historial</button>
+    <button class="nav-tab" id="navDieta" onclick="goTab('dieta')"><span class="nav-icon">🍽️</span>Dieta</button>
     <button class="nav-tab" id="navStats" onclick="goTab('stats')"><span class="nav-icon">📈</span>Stats</button>
   </nav>
 </div>
@@ -345,7 +347,7 @@ const DAY_ABR=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 // ═══════════════════════════════════════
 var DB=null;
 var selectedDateKey=null;
-var S={streak:0,totalXP:0,session:{},logs:{},dayOverrides:{},sessStartTs:null,sessAccum:0,restEndTs:null,restSavedSecs:0,pendingSession:null};
+var S={streak:0,totalXP:0,session:{},logs:{},dayOverrides:{},sessStartTs:null,sessAccum:0,restEndTs:null,restSavedSecs:0,pendingSession:null,dietLog:{}};
 
 function idbOpen(){return new Promise(function(ok,fail){var r=indexedDB.open('forge3',1);r.onupgradeneeded=function(e){e.target.result.createObjectStore('kv')};r.onsuccess=function(e){DB=e.target.result;ok()};r.onerror=fail})}
 function idbGet(k){return new Promise(function(ok){var t=DB.transaction('kv','readonly');var r=t.objectStore('kv').get(k);r.onsuccess=function(){ok(r.result||null)}})}
@@ -366,6 +368,7 @@ async function loadS(){
   }
   // Garantizar campos críticos aunque no haya datos guardados
   if(!S.dayOverrides)S.dayOverrides={};
+  if(!S.dietLog)S.dietLog=d&&d.dietLog?d.dietLog:{};
   if(!S.session)S.session={};
   if(!S.logs)S.logs={};
 }
@@ -539,13 +542,14 @@ function goTab(t){
   // Limpiar barras flotantes al cambiar tab
   var fb=document.getElementById('fixedCompleteBar');if(fb&&t!=='hoy')fb.style.display='none';
   var cb=document.getElementById('confirmBar');if(cb)cb.remove();
-  ['hoy','historial','stats'].forEach(function(id){
+  ['hoy','historial','dieta','stats'].forEach(function(id){
     document.getElementById('view'+id.charAt(0).toUpperCase()+id.slice(1)).style.display=t===id?'block':'none';
     document.getElementById('nav'+id.charAt(0).toUpperCase()+id.slice(1)).classList.toggle('active',t===id);
   });
   document.getElementById('scrollArea').scrollTop=0;
   if(t==='hoy')renderHoy();
   if(t==='historial')renderHistorial();
+  if(t==='dieta')renderDieta();
   if(t==='stats')renderStats();
 }
 
@@ -1193,6 +1197,115 @@ function diagnostico(){
   }
   console.log('%c═══════════════════════════════','color:#7f77dd;font-weight:bold');
 }
+
+const DIET={"1": {"kcal": 2861, "prot": 152, "carbos": 308, "grasas": 79, "nota": "Clases 3pm–8pm · Llevas merienda en la mochila", "meals": [{"h": "9:15am", "emoji": "🍳", "t": "Desayuno en casa", "d": "3 huevos · 4 reb. pan · 250ml leche · 1 banana", "kcal": 787, "p": 35}, {"h": "10:30am", "emoji": "☕", "t": "Café negro", "d": "30 min antes del gym", "kcal": 0, "p": 0}, {"h": "11:00am", "emoji": "🏋️", "t": "GYM", "d": "75 min máx · terminas ~12:15pm", "kcal": 0, "p": 0, "tag": "entreno"}, {"h": "12:15pm", "emoji": "🥤", "t": "Shake post-gym + creatina", "d": "1 scoop ISO · 300ml leche · 1 banana · 5g creatina", "kcal": 407, "p": 38}, {"h": "1:30pm", "emoji": "🍽️", "t": "Almuerzo en casa", "d": "2 platos: carne + arroz + papa · 📦 lleva 2 huevos + 1 banana", "kcal": 800, "p": 45}, {"h": "6:00pm", "emoji": "🍌", "t": "Merienda entre clases", "d": "2 huevos duros + 1 banana", "kcal": 247, "p": 13}, {"h": "8:30pm", "emoji": "🍲", "t": "Caldo al llegar", "d": "2 presas pollo · 100g arroz crudo", "kcal": 620, "p": 46}]}, "2": {"kcal": 2861, "prot": 152, "carbos": 308, "grasas": 79, "nota": "Clases 3pm–7:10pm · Terminas antes", "meals": [{"h": "9:15am", "emoji": "🍳", "t": "Desayuno en casa", "d": "3 huevos · 4 reb. pan · 250ml leche · 1 banana", "kcal": 787, "p": 35}, {"h": "10:30am", "emoji": "☕", "t": "Café negro", "d": "", "kcal": 0, "p": 0}, {"h": "11:00am", "emoji": "🏋️", "t": "GYM · 75 min", "d": "", "kcal": 0, "p": 0, "tag": "entreno"}, {"h": "12:15pm", "emoji": "🥤", "t": "Shake post-gym + creatina", "d": "1 scoop ISO · 300ml leche · 1 banana · 5g creatina", "kcal": 407, "p": 38}, {"h": "1:30pm", "emoji": "🍽️", "t": "Almuerzo en casa", "d": "2 platos: carne + arroz + papa · 📦 lleva 2 huevos + 1 banana", "kcal": 800, "p": 45}, {"h": "5:30pm", "emoji": "🍌", "t": "Merienda entre clases", "d": "2 huevos duros + 1 banana", "kcal": 247, "p": 13}, {"h": "7:30pm", "emoji": "🍲", "t": "Caldo al llegar", "d": "2 presas pollo · 100g arroz crudo", "kcal": 620, "p": 46}]}, "3": {"kcal": 2908, "prot": 158, "carbos": 312, "grasas": 82, "nota": "Día más largo 3pm–8:50pm · Merienda doble", "meals": [{"h": "9:15am", "emoji": "🍳", "t": "Desayuno en casa", "d": "3 huevos · 4 reb. pan · 250ml leche · 1 banana", "kcal": 787, "p": 35}, {"h": "10:30am", "emoji": "☕", "t": "Café negro", "d": "", "kcal": 0, "p": 0}, {"h": "11:00am", "emoji": "🏋️", "t": "GYM · 75 min", "d": "", "kcal": 0, "p": 0, "tag": "entreno"}, {"h": "12:15pm", "emoji": "🥤", "t": "Shake post-gym + creatina", "d": "1 scoop ISO · 300ml leche · 1 banana · 5g creatina", "kcal": 407, "p": 38}, {"h": "1:30pm", "emoji": "🍽️", "t": "Almuerzo — tú cocinas", "d": "Pechuga 200g · arroz 120g · papa · 📦 doble merienda", "kcal": 834, "p": 55}, {"h": "5:30pm", "emoji": "🍌", "t": "Merienda 1 entre clases", "d": "2 huevos duros + 1 banana", "kcal": 247, "p": 13}, {"h": "7:10pm", "emoji": "🥜", "t": "Merienda 2 antes de Mate III", "d": "2 reb. pan + 1 cda maní", "kcal": 220, "p": 7}, {"h": "9:00pm", "emoji": "🍲", "t": "Caldo al llegar", "d": "2 presas pollo · 100g arroz crudo", "kcal": 620, "p": 46}]}, "4": {"kcal": 2861, "prot": 152, "carbos": 308, "grasas": 79, "nota": "Clases 3pm–8pm · Igual que el lunes", "meals": [{"h": "9:15am", "emoji": "🍳", "t": "Desayuno en casa", "d": "3 huevos · 4 reb. pan · 250ml leche · 1 banana", "kcal": 787, "p": 35}, {"h": "10:30am", "emoji": "☕", "t": "Café negro", "d": "", "kcal": 0, "p": 0}, {"h": "11:00am", "emoji": "🏋️", "t": "GYM · 75 min", "d": "", "kcal": 0, "p": 0, "tag": "entreno"}, {"h": "12:15pm", "emoji": "🥤", "t": "Shake post-gym + creatina", "d": "1 scoop ISO · 300ml leche · 1 banana · 5g creatina", "kcal": 407, "p": 38}, {"h": "1:30pm", "emoji": "🍽️", "t": "Almuerzo — tú cocinas", "d": "Pechuga 200g · arroz 120g · papa · 📦 lleva 2 huevos + 1 banana", "kcal": 834, "p": 55}, {"h": "6:00pm", "emoji": "🍌", "t": "Merienda entre clases", "d": "2 huevos duros + 1 banana", "kcal": 247, "p": 13}, {"h": "8:30pm", "emoji": "🍲", "t": "Caldo al llegar", "d": "2 presas pollo · 100g arroz crudo", "kcal": 620, "p": 46}]}, "5": {"kcal": 2891, "prot": 150, "carbos": 298, "grasas": 85, "nota": "Informática 10am · gym nocturno · estructura invertida", "meals": [{"h": "9:00am", "emoji": "🍳", "t": "Desayuno rápido antes de clase", "d": "3 huevos · 4 reb. pan · 250ml leche · 1 banana", "kcal": 787, "p": 35}, {"h": "1:30pm", "emoji": "🍽️", "t": "Almuerzo en casa", "d": "2 platos: carne + arroz + papa", "kcal": 800, "p": 45}, {"h": "4:30pm", "emoji": "⚡", "t": "Pre-entreno nocturno", "d": "2 reb. pan + 1 banana · carbos para el gym", "kcal": 267, "p": 6}, {"h": "5:00pm", "emoji": "☕", "t": "Café negro", "d": "30 min antes del gym", "kcal": 0, "p": 0}, {"h": "5:30pm", "emoji": "🏋️", "t": "GYM nocturno", "d": "75 min · terminas ~6:45pm", "kcal": 0, "p": 0, "tag": "entreno"}, {"h": "6:45pm", "emoji": "🥤", "t": "Shake post-gym + creatina", "d": "1 scoop ISO · 300ml leche · 1 banana · 5g creatina", "kcal": 407, "p": 38}, {"h": "8:00pm", "emoji": "🍲", "t": "Caldo — cena post-entreno", "d": "2 presas pollo · 100g arroz crudo", "kcal": 620, "p": 46}]}};
+
+// ═══════════════════════════════════════
+// DIETA
+// ═══════════════════════════════════════
+function dietTodayKey(){return 'diet_'+todayKey();}
+
+function toggleMeal(idx){
+  var k=dietTodayKey();
+  if(!S.dietLog)S.dietLog={};
+  if(!S.dietLog[k])S.dietLog[k]={};
+  S.dietLog[k][idx]=!S.dietLog[k][idx];
+  saveS();
+  renderDieta();
+}
+
+function renderDieta(){
+  if(!document.getElementById('viewDieta'))return;
+  var el=document.getElementById('viewDieta');
+  var dw=dow();
+  var plan=DIET[String(dw)];
+
+  // Fin de semana: sin plan estructurado
+  if(!plan){
+    el.innerHTML='<div style="padding:4px 0"></div>'
+      +'<div class="rest-card"><div class="rest-icon">🍽️</div>'
+      +'<div class="rest-title">Fin de semana</div>'
+      +'<div class="rest-sub">Sin plan estructurado hoy.<br>Mantén proteína alta y come intuitivo.</div></div>';
+    return;
+  }
+
+  var k=dietTodayKey();
+  var log=(S.dietLog&&S.dietLog[k])||{};
+
+  // Calcular consumido
+  var consKcal=0,consProt=0,doneCount=0,totalMeals=0;
+  plan.meals.forEach(function(m,i){
+    if(m.kcal>0||m.p>0)totalMeals++;
+    if(log[i]){consKcal+=m.kcal;consProt+=m.p;if(m.kcal>0||m.p>0)doneCount++;}
+  });
+
+  var pctKcal=Math.round(consKcal/plan.kcal*100);
+  var pctProt=Math.round(consProt/plan.prot*100);
+
+  var html='<div style="padding:4px 0"></div>';
+
+  // Header con nota del día
+  html+='<div class="sec-lbl">Plan de hoy — '+DOW_NAMES[dw]+'</div>';
+  html+='<div style="margin:0 20px 12px;font-size:12px;color:var(--muted);line-height:1.5">'+plan.nota+'</div>';
+
+  // Barras de progreso kcal y proteína
+  html+='<div style="margin:0 20px 16px">';
+  // KCAL
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">'
+    +'<span style="font-size:12px;font-weight:600;color:var(--gold)">CALORÍAS</span>'
+    +'<span style="font-size:13px;color:var(--text)"><b>'+consKcal+'</b> / '+plan.kcal+' kcal</span></div>';
+  html+='<div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:12px">'
+    +'<div style="height:100%;background:var(--gold);width:'+Math.min(100,pctKcal)+'%;transition:width .4s;border-radius:4px"></div></div>';
+  // PROTEÍNA
+  html+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">'
+    +'<span style="font-size:12px;font-weight:600;color:var(--green-txt)">PROTEÍNA</span>'
+    +'<span style="font-size:13px;color:var(--text)"><b>'+consProt+'</b> / '+plan.prot+'g</span></div>';
+  html+='<div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden">'
+    +'<div style="height:100%;background:var(--green);width:'+Math.min(100,pctProt)+'%;transition:width .4s;border-radius:4px"></div></div>';
+  html+='</div>';
+
+  // Resumen macros del día
+  html+='<div style="display:flex;gap:8px;margin:0 20px 16px">';
+  html+='<div style="flex:1;background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-sm);padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--gold)">'+plan.carbos+'g</div><div style="font-size:10px;color:var(--muted)">carbos</div></div>';
+  html+='<div style="flex:1;background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-sm);padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:#e07050">'+plan.grasas+'g</div><div style="font-size:10px;color:var(--muted)">grasas</div></div>';
+  html+='<div style="flex:1;background:var(--surface);border:.5px solid var(--border);border-radius:var(--r-sm);padding:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--xp)">'+doneCount+'/'+totalMeals+'</div><div style="font-size:10px;color:var(--muted)">comidas</div></div>';
+  html+='</div>';
+
+  // Timeline de comidas
+  html+='<div class="sec-lbl">Comidas del día</div>';
+  plan.meals.forEach(function(m,i){
+    var checked=!!log[i];
+    var isEntreno=m.tag==='entreno';
+    var borderC=checked?'var(--green)':(isEntreno?'var(--xp-dim)':'var(--border)');
+    var bgC=checked?'var(--green-bg)':'var(--surface)';
+    html+='<div onclick="toggleMeal('+i+')" style="margin:0 20px 8px;background:'+bgC+';border:.5px solid '+borderC+';border-radius:var(--r);padding:12px 14px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;transition:all .15s">';
+    // Hora + check
+    html+='<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px">';
+    html+='<div style="font-size:10px;color:var(--muted);font-weight:600">'+m.h+'</div>';
+    var ringC=checked?'background:var(--green);border-color:var(--green);color:#fff':'border-color:var(--border2);color:transparent';
+    html+='<div style="width:24px;height:24px;border-radius:50%;border:1.5px solid;display:flex;align-items:center;justify-content:center;font-size:13px;'+ringC+'">✓</div>';
+    html+='</div>';
+    // Contenido
+    html+='<div style="flex:1">';
+    html+='<div style="font-size:14px;font-weight:600;color:'+(checked?'var(--green-txt)':'var(--text)')+'">'+m.emoji+' '+m.t+'</div>';
+    if(m.d)html+='<div style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4">'+m.d+'</div>';
+    if(m.kcal>0||m.p>0)html+='<div style="font-size:11px;color:var(--gold);margin-top:4px">'+m.kcal+' kcal · '+m.p+'g P</div>';
+    else if(isEntreno)html+='<div style="font-size:10px;color:var(--xp);margin-top:4px;text-transform:uppercase;letter-spacing:.5px">entreno</div>';
+    html+='</div>';
+    html+='</div>';
+  });
+
+  // Botón reset del día
+  html+='<div style="margin:16px 20px 0"><button onclick="resetDietDay()" style="width:100%;padding:12px;background:transparent;border:.5px solid var(--border2);border-radius:var(--r);color:var(--muted);font-size:13px;font-family:inherit;cursor:pointer">Reiniciar día</button></div>';
+
+  el.innerHTML=html;
+}
+
+function resetDietDay(){
+  var k=dietTodayKey();
+  if(S.dietLog&&S.dietLog[k]){delete S.dietLog[k];saveS();renderDieta();showToast('Día de dieta reiniciado');}
+}
+
 
 async function init(){
   showSplash();
