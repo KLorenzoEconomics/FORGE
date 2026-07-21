@@ -649,12 +649,43 @@ function renderHoy(){
   var html='<div style="padding:4px 0"></div>';
 
   var esDomingo=selDow===0;
-  var esSabado=selDow===6;
-  // Un día es "reprogramable" si: no está completado, no es domingo.
-  // Sábado sí es reprogramable (el gym abre) aunque por defecto sea descanso.
-  var puedeReprogramar=!done && !esDomingo;
 
-  // Banner para días NAVEGADOS (no hoy)
+  // ══════════════════════════════════════════
+  // LÓGICA HOY: elegir libremente qué sesión entrenar
+  // ══════════════════════════════════════════
+  if(isToday){
+    // La sesión activa hoy = override elegido, o la que toca por calendario
+    var activeId = ovId || DOW_MAP[selDow] || null;
+    var activeR = activeId ? ROUTINE.find(function(x){return x.id===activeId}) : null;
+    eR = activeR;
+
+    // Selector de sesión: SIEMPRE visible en hoy (salvo que ya completó algo hoy)
+    if(!done){
+      var yaHechas=completedThisWeek();
+      var faltan=ROUTINE.filter(function(ro){return yaHechas.indexOf(ro.id)<0});
+      html+='<div class="banner banner-nav">';
+      html+='<div style="font-size:12px;color:var(--gold);margin-bottom:4px">🏋️ ¿Qué vas a entrenar hoy?</div>';
+      html+='<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Toca la sesión que harás. Se registra hoy.</div>';
+      html+='<div class="session-btns">';
+      ROUTINE.forEach(function(ro){
+        var yaHecha=yaHechas.indexOf(ro.id)>=0;
+        var active=activeId===ro.id;
+        if(yaHecha && !active){
+          // Ya completada esta semana: mostrar deshabilitada con ✓
+          html+='<button class="session-btn" style="opacity:.4;cursor:default" disabled>'+ro.name+' ✓</button>';
+        }else{
+          var act=active?"toggleSession('"+tk+"','"+ro.id+"')":"assignSession('"+tk+"','"+ro.id+"')";
+          html+='<button class="session-btn'+(active?' active':'')+'" onclick="'+act+'">'+ro.name+(active?' ✓':'')+'</button>';
+        }
+      });
+      html+='</div>';
+      html+='</div>';
+    }
+  }
+
+  // ══════════════════════════════════════════
+  // Banner para días NAVEGADOS (no hoy) — solo lectura o info
+  // ══════════════════════════════════════════
   if(!isToday){
     var parts=tk.split('-');var label=DAY_ABR[selDow]+' '+parseInt(parts[2])+'/'+parseInt(parts[1]);
     var ovTag=ovR?' · <span style="color:var(--gold)">reprogramado</span>':'';
@@ -663,43 +694,23 @@ function renderHoy(){
       +'<div style="font-size:12px;color:var(--muted)">📅 <b style="color:var(--text)">'+label+'</b>'+ovTag+'</div>'
       +'<button onclick="selectedDateKey=null;renderHoy();renderCal();" style="background:var(--xp-bg);border:.5px solid var(--xp-dim);color:var(--xp);border-radius:var(--r-sm);padding:6px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer">Hoy</button>'
       +'</div>';
-    var esPasado=tk<todayKey();
     if(done){
-      html+='<div style="font-size:11px;color:var(--green-txt);margin-top:6px">✓ Sesión ya completada este día — no editable</div>';
-    }else if(esDomingo){
-      html+='<div style="font-size:11px;color:var(--muted);margin-top:6px">🛌 Domingo es día de descanso</div>';
-    }else if(esPasado){
-      html+='<div style="font-size:11px;color:#d85a30;margin-top:6px">✗ Día pasado sin completar — ya no se puede entrenar</div>';
+      html+='<div style="font-size:11px;color:var(--green-txt);margin-top:6px">✓ Sesión ya completada este día</div>';
     }else{
-      html+=sessionButtonsHTML(tk,ovId,selDow);
+      html+='<div style="font-size:11px;color:var(--muted);margin-top:6px">Solo puedes entrenar y registrar en el día actual. Vuelve a <b style="color:var(--xp)">Hoy</b> para entrenar.</div>';
     }
     html+='</div>';
   }
 
-  // Banner de reprogramación para HOY cuando es sábado (descanso pero gym abre) sin sesión asignada
-  if(isToday && esSabado && !ovR && !done){
-    html+='<div class="banner banner-nav">'
-      +'<div style="font-size:12px;color:var(--gold);margin-bottom:8px">🏋️ Hoy es sábado — ¿vas a entrenar? Elige la sesión:</div>'
-      +sessionButtonsHTML(tk,ovId,selDow)
-      +'</div>';
-  }
-
-  // Sin sesión y sin pendiente
+  // Sin sesión elegida hoy (o día de descanso navegado)
   if(!eR){
-    html+='<div class="rest-card"><div class="rest-icon">🛌</div><div class="rest-title">Día de descanso</div><div class="rest-sub">Recupera. Los músculos crecen fuera del gym.<br>Mañana volvemos.</div></div>';
-    el.innerHTML=html;return;
-  }
-
-  // Banner sesión perdida/recuperada (solo hoy)
-  if(isToday&&!done){
-    if(pendR){
-      html+='<div class="banner banner-gold"><div style="font-size:12px;color:var(--gold)">Sesión recuperada: <b>'+pendR.name+'</b></div><div style="font-size:11px;color:var(--muted);margin-top:2px">Completala hoy para mantener el progreso.</div></div>';
-    }else if(baseR){
-      html+='<div class="banner banner-gold" style="display:flex;justify-content:space-between;align-items:center">'
-        +'<div style="font-size:12px;color:var(--gold);line-height:1.5">¿No pudiste venir hoy?<br><span style="color:var(--muted);font-size:11px">Pasa la sesión a mañana — la racha se reinicia.</span></div>'
-        +'<button onclick="missSession()" style="background:var(--gold-bg);border:.5px solid var(--gold);color:var(--gold);border-radius:var(--r-sm);padding:8px 12px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;margin-left:10px">Pasar →</button>'
-        +'</div>';
+    if(isToday && !done){
+      // Hoy sin sesión elegida aún: mostrar mensaje de elegir arriba
+      html+='<div class="rest-card"><div class="rest-icon">👆</div><div class="rest-title">Elige tu sesión</div><div class="rest-sub">Toca arriba la sesión que vas a entrenar hoy.<br>O descansa si es tu día libre.</div></div>';
+    }else{
+      html+='<div class="rest-card"><div class="rest-icon">🛌</div><div class="rest-title">Día de descanso</div><div class="rest-sub">Recupera. Los músculos crecen fuera del gym.<br>Mañana volvemos.</div></div>';
     }
+    el.innerHTML=html;return;
   }
 
   var totalSets=eR.exercises.reduce(function(a,e){return a+e.sets},0);
@@ -717,8 +728,8 @@ function renderHoy(){
   html+='</div>';
   html+='<div class="session-body">';
 
-  // Timers cuando se puede entrenar ahora (hoy o día reprogramado) y no completada
-  var showTimers=(isToday||!!ovR)&&!done;
+  // Timers cuando hay sesión elegida hoy y no completada
+  var showTimers=isToday&&!done;
   if(showTimers){
     html+='<div class="dual-timer">';
     html+='<div class="timer-block"><div class="timer-lbl">Descanso</div>'
@@ -786,14 +797,12 @@ function renderHoy(){
     html+='</div>';
   });
 
-  // Botón completar
-  var canComplete=isToday;  // Solo se puede completar el día actual, no días pasados
+  // Botón completar: en HOY siempre se puede completar la sesión elegida
+  var canComplete=isToday;
   if(canComplete&&!done){
     html+='<div style="height:20px"></div>';
   }else if(done){
     html+='<div class="banner banner-done" style="margin:18px 0 0"><span style="color:var(--green-txt);font-size:13px">✓ Completado'+(log.durSecs?' · '+fmtDur(log.durSecs):'')+' </span></div>';
-  }else{
-    html+='<div class="banner banner-info" style="margin:18px 0 0;font-size:12px;color:var(--muted)">Asigna una sesión arriba para completarla</div>';
   }
 
   html+='</div></div>';
