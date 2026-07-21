@@ -1,4 +1,4 @@
-const CACHE = 'forge-v33';
+const CACHE = 'forge-v34';
 const ASSETS = [
   '/FORGE/',
   '/FORGE/index.html',
