@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192-v2.png">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;background:#0a0505}
@@ -60,9 +60,6 @@ body{font-family:'Barlow',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
 .hero-greeting{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:4px}
 .hero-name{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
 .hero-name span{color:var(--xp)}
-.streak-pill{display:flex;align-items:center;gap:6px;background:var(--fire-bg);border:.5px solid var(--fire);border-radius:20px;padding:6px 12px;flex-shrink:0}
-.streak-n{font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:var(--fire);line-height:1}
-.streak-lbl{font-size:11px;color:var(--fire);opacity:.7;line-height:1.2}
 /* Date */
 .date-bar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin-top:14px}
 .date-weekday{font-size:11px;font-weight:600;color:var(--xp);text-transform:uppercase;letter-spacing:1px}
@@ -225,12 +222,7 @@ input[type=number]{-moz-appearance:textfield}
         <div class="hero-greeting">Bienvenido</div>
         <div class="hero-name">Kevin <span>Lorenzo</span></div>
       </div>
-      <div class="streak-pill">
-        <div>
-          <div class="streak-n" id="streakN">0</div>
-          <div class="streak-lbl">racha 🔥</div>
-        </div>
-      </div>
+
     </div>
     <div class="date-bar">
       <div>
@@ -280,15 +272,10 @@ input[type=number]{-moz-appearance:textfield}
     <div class="splash-greeting">SESIÓN COMPLETADA</div>
     <div class="splash-name" id="cName">PUSH</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:20px" id="cDur"></div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:24px">
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:24px">
       <div style="text-align:center">
-        <div style="font-size:48px;font-weight:700;color:var(--fire);line-height:1" id="cStreak">0</div>
-        <div style="font-size:11px;color:var(--fire);opacity:.8;text-transform:uppercase;letter-spacing:1px;margin-top:3px">🔥 racha</div>
-      </div>
-      <div style="width:1px;height:44px;background:var(--border2)"></div>
-      <div style="text-align:center">
-        <div style="font-size:48px;font-weight:700;color:var(--xp);line-height:1" id="cXP">+80</div>
-        <div style="font-size:11px;color:var(--xp);opacity:.8;text-transform:uppercase;letter-spacing:1px;margin-top:3px">XP</div>
+        <div style="font-size:52px;font-weight:700;color:var(--xp);line-height:1" id="cXP">+80</div>
+        <div style="font-size:11px;color:var(--xp);opacity:.8;text-transform:uppercase;letter-spacing:1px;margin-top:3px">XP GANADOS</div>
       </div>
     </div>
     <div class="splash-divider"></div>
@@ -512,7 +499,15 @@ function refreshRestBtn(){var b=document.getElementById('restGoBtn');if(!b)retur
 var sessRunning=false,sessInt=null;
 function getSessSecs(){if(sessRunning&&S.sessStartTs)return (S.sessAccum||0)+Math.floor((Date.now()-S.sessStartTs)/1000);return S.sessAccum||0}
 function refreshSessDisp(){var el=document.getElementById('sessDisp');if(!el)return;var t=getSessSecs();var h=Math.floor(t/3600);var m=String(Math.floor((t%3600)/60)).padStart(2,'0');var s=String(t%60).padStart(2,'0');el.textContent=h>0?(h+':'+m+':'+s):(m+':'+s)}
-function startSess(){if(sessRunning)return;S.sessStartTs=Date.now();sessRunning=true;saveS();sessInt=setInterval(refreshSessDisp,1000);refreshSessBtn()}
+function startSess(){
+  if(sessRunning)return;
+  S.sessStartTs=Date.now();sessRunning=true;saveS();
+  sessInt=setInterval(refreshSessDisp,1000);refreshSessBtn();
+  // Iniciar notificación persistente con el nombre de la sesión activa
+  var actId=S.dayOverrides&&S.dayOverrides[todayKey()]?S.dayOverrides[todayKey()]:DOW_MAP[dow()];
+  var actR=actId?ROUTINE.find(function(x){return x.id===actId}):null;
+  startWorkoutNotification(actR?actR.name:'');
+}
 function stopSess(){if(sessRunning){S.sessAccum=getSessSecs();S.sessStartTs=null;saveS()}clearInterval(sessInt);sessRunning=false;sessInt=null;refreshSessBtn()}
 function toggleSess(){sessRunning?stopSess():initCountdown()}
 function refreshSessBtn(){var b=document.getElementById('sessGoBtn');if(!b)return;b.textContent=sessRunning?'⏸ Pausar':'▶ Iniciar sesión';b.className='t-btn '+(sessRunning?'srun':'sgo')}
@@ -632,7 +627,6 @@ function renderXP(){
   document.getElementById('xpLevel').textContent='NIVEL '+lvl;
   document.getElementById('xpPts').textContent=S.totalXP+' / '+lvl*200+' XP';
   document.getElementById('xpFill').style.width=Math.min(100,Math.round(inLvl/200*100))+'%';
-  document.getElementById('streakN').textContent=S.streak;
 }
 
 // ═══════════════════════════════════════
@@ -868,6 +862,7 @@ function askCancel(dayId,tk){
 }
 
 function doCancel(dayId){
+  stopWorkoutNotification();
   // Borrar sets de la sesión en curso de ese ejercicio-día
   var keys=Object.keys(S.session);
   keys.forEach(function(k){if(k.indexOf(dayId+'_')===0)delete S.session[k]});
@@ -940,7 +935,7 @@ function getPrevSet(dayId,ei,si){
 }
 
 function dayColor(id){return{push:'#e53935',pull:'#c62828',legs:'#d32f2f',upper:'#b71c1c',lower:'#f4511e'}[id]||'#c62828'}
-function xpForDay(){var b=80;if(S.streak>=14)b+=20;else if(S.streak>=7)b+=10;return b}
+function xpForDay(){return 80;}
 
 // ═══════════════════════════════════════
 // SET INTERACTIONS
@@ -994,19 +989,30 @@ async function completeOn(dayId,tk){
   var dur=isToday?getSessSecs():0;
   if(isToday){stopSess();stopRest();S.restSavedSecs=0;S.restEndTs=null}
   var xp=xpForDay();
-  S.logs[tk]={completed:true,session:Object.assign({},S.session),dayId:dayId,ts:Date.now(),durSecs:dur};
-  S.pendingSession=null;S.totalXP+=xp;calcStreak();await saveS();
+  // Guardar SOLO los sets de esta sesión (dayId), no toda la sesión global
+  var sessionData={};
+  Object.keys(S.session).forEach(function(k){
+    if(k.indexOf(dayId+'_')===0)sessionData[k]=S.session[k];
+  });
+  S.logs[tk]={completed:true,session:sessionData,dayId:dayId,ts:Date.now(),durSecs:dur};
+  // Limpiar la sesión en curso (los sets de este dayId) para el próximo entrenamiento
+  Object.keys(S.session).forEach(function(k){
+    if(k.indexOf(dayId+'_')===0)delete S.session[k];
+  });
+  // Quitar el override del día para que quede registrado limpio
+  if(S.dayOverrides&&S.dayOverrides[tk])delete S.dayOverrides[tk];
+  S.pendingSession=null;S.totalXP+=xp;
+  await saveS();
   if(isToday)resetSessTimer();
+  stopWorkoutNotification(); // detener notificación persistente
   renderXP();renderCal();
-  if(isToday)showCompleteSplash(dayId,xp,dur);
-  else showToast('✓ '+ROUTINE.find(function(x){return x.id===dayId}).name+' registrado');
+  showCompleteSplash(dayId,xp,dur);
   renderHoy();
 }
 
 function showCompleteSplash(dayId,xp,dur){
   var r=ROUTINE.find(function(x){return x.id===dayId});
   document.getElementById('cName').textContent=r.name;
-  document.getElementById('cStreak').textContent=S.streak;
   document.getElementById('cXP').textContent='+'+xp;
   document.getElementById('cDur').textContent=dur>0?'⏱ '+fmtDur(dur):'';
   var el=document.getElementById('csplash');
@@ -1061,8 +1067,8 @@ function assignSession(dk,routineId){
 }
 function missSession(){
   var r=todayRoutine();if(!r)return;
-  S.pendingSession=r.id;S.streak=0;saveS();renderXP();renderHoy();
-  showToast('Sesión pasada a mañana. Racha reiniciada.');
+  S.pendingSession=r.id;saveS();renderHoy();
+  showToast('Sesión pasada a mañana.');
 }
 
 // ═══════════════════════════════════════
@@ -1100,7 +1106,6 @@ function renderStats(){
   var lvl=Math.floor(S.totalXP/200)+1;
   var h='<div style="padding:4px 0"></div><div class="sec-lbl">Resumen general</div>';
   h+='<div class="stats-grid">';
-  h+='<div class="stat-tile"><div class="stat-val fire">'+S.streak+'</div><div class="stat-lbl">🔥 racha actual</div></div>';
   h+='<div class="stat-tile"><div class="stat-val xp">'+total+'</div><div class="stat-lbl">sesiones totales</div></div>';
   h+='<div class="stat-tile"><div class="stat-val gold">'+S.totalXP+'</div><div class="stat-lbl">XP acumulados</div></div>';
   h+='<div class="stat-tile"><div class="stat-val grn">Lv.'+lvl+'</div><div class="stat-lbl">nivel actual</div></div>';
@@ -1323,6 +1328,53 @@ function resetDietDay(){
 }
 
 
+
+// ═══════════════════════════════════════
+// NOTIFICACIÓN PERSISTENTE DE ENTRENAMIENTO
+// ═══════════════════════════════════════
+var swReg=null;
+
+async function requestNotifPermission(){
+  if(!('Notification' in window))return false;
+  if(Notification.permission==='granted')return true;
+  if(Notification.permission!=='denied'){
+    var p=await Notification.requestPermission();
+    return p==='granted';
+  }
+  return false;
+}
+
+async function startWorkoutNotification(sessionName){
+  var ok=await requestNotifPermission();
+  if(!ok)return;
+  if(!swReg){
+    try{swReg=await navigator.serviceWorker.ready;}catch(e){return;}
+  }
+  try{
+    await swReg.showNotification('🏋️ FORGE — Entrenando '+sessionName,{
+      body:'Sesión en curso. No cierres hasta completar.',
+      tag:'forge-workout',
+      ongoing:true,        // Android: notificación en curso
+      persistent:true,
+      requireInteraction:true,  // no se descarta sola
+      silent:true,
+      icon:'icon-192-v2.png',
+      badge:'icon-192-v2.png'
+    });
+  }catch(e){console.warn('Notif error:',e);}
+}
+
+async function stopWorkoutNotification(){
+  if(!swReg){
+    try{swReg=await navigator.serviceWorker.ready;}catch(e){return;}
+  }
+  try{
+    var notifs=await swReg.getNotifications({tag:'forge-workout'});
+    notifs.forEach(function(n){n.close();});
+  }catch(e){}
+}
+
+
 async function init(){
   showSplash();
   try{
@@ -1343,8 +1395,8 @@ async function init(){
   // ═══ DIAGNÓSTICO DETALLADO EN CONSOLA ═══
   diagnostico();
   var nHist=Object.keys(S.logs||{}).filter(function(k){return k<todayKey()}).length;
-  if(nHist>0){setTimeout(function(){showToast('✓ '+nHist+' días de historial · racha '+S.streak);},2500);}
-  if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+  if(nHist>0){setTimeout(function(){showToast('✓ '+nHist+' días de historial cargados');},2500);}
+  if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').then(function(r){swReg=r;}).catch(function(){});}
   document.addEventListener('visibilitychange',function(){if(!document.hidden){refreshSessDisp();refreshRestDisp()}});
 }
 init();
