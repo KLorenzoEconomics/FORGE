@@ -1,10 +1,10 @@
-const CACHE = 'forge-v36';
+const CACHE = 'forge-v37';
 const ASSETS = [
   '/FORGE/',
   '/FORGE/index.html',
   '/FORGE/manifest.json',
-  '/FORGE/icon-192.png',
-  '/FORGE/icon-512.png',
+  '/FORGE/icon-192-v2.png',
+  '/FORGE/icon-512-v2.png',
 ];
 
 self.addEventListener('install', e => {
@@ -31,6 +31,19 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE).then(c => c.put(e.request, clone));
         return res;
       }).catch(() => caches.match('/FORGE/index.html'));
+    })
+  );
+});
+
+// Al tocar la notificación, abrir/enfocar la app
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({type:'window', includeUncontrolled:true}).then(list => {
+      for (const c of list) {
+        if (c.url.includes('/FORGE/') && 'focus' in c) return c.focus();
+      }
+      if (clients.openWindow) return clients.openWindow('/FORGE/');
     })
   );
 });
